@@ -1,5 +1,6 @@
 import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+// @ts-ignore
 import "leaflet/dist/leaflet.css";
 import { Sucursal } from "../types/Sucursal";
 
