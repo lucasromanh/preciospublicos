@@ -22,3 +22,4 @@ const Header: React.FC<HeaderProps> = ({ onScanClick }) => (
 );
 
 export default Header;
+
