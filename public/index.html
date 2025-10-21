@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a9396" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>Precios Claros Argentina</title>
+  </head>
+  <body class="bg-white text-gray-900 dark:bg-gray-900 dark:text-white">
+    <div id="root">
+  <!-- Fallback visible si React no se carga -->
+  <div id="static-fallback" style="color:#e11d48; font-family: sans-serif; display: block; text-align:center; padding-top:20px;">JS no cargado — comprueba la consola y que el servidor dev está corriendo</div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+  // Registrar service worker sólo en producción
+      if (location.hostname !== 'localhost' && 'serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        });
+      }
+    </script>
+  </body>
+</html>
