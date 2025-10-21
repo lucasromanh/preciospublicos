@@ -10,7 +10,7 @@ interface MapViewProps {
 }
 
 const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
-  const center = (userLocation as any) || { lat: -34.6037, lng: -58.3816 }; // CABA por defecto
+  const center = userLocation || { lat: -34.6037, lng: -58.3816 }; // CABA por defecto
   return (
     <div className="w-full h-48 rounded overflow-hidden">
       <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }}>
@@ -38,3 +38,4 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
 };
 
 export default MapView;
+

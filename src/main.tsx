@@ -1,8 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-// @ts-ignore
 import "./tailwind.css";
+
+// En desarrollo, desregistrar cualquier service worker previo
+if (location.hostname === "localhost" && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach(r => r.unregister())).catch(()=>{});
+}
 
 try {
   console.log('Mounting PreciosAR app...');
@@ -15,7 +19,8 @@ try {
 } catch (err) {
   console.error('Error mounting app', err);
 }
-// Si el script corre, ocultar el fallback estático
+
+// Ocultar fallback si el script corre
 try {
   const fallback = document.getElementById('static-fallback');
   if (fallback) fallback.style.display = 'none';
