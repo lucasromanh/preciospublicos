@@ -25,10 +25,18 @@ interface MapViewProps {
 }
 
 const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
-  const center = userLocation || { lat: -34.6037, lng: -58.3816 }; // CABA por defecto
+  const [center, setCenter] = React.useState(userLocation || { lat: -34.6037, lng: -58.3816 });
   useEffect(() => {
-    // Esto asegura que los iconos se apliquen solo una vez
-  }, []);
+    if (!userLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else if (userLocation) {
+      setCenter(userLocation);
+    }
+  }, [userLocation]);
   return (
     <div className="w-full h-48 rounded overflow-hidden">
       <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }}>
@@ -36,11 +44,9 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {userLocation && (
-          <Marker position={center} icon={customIcon}>
-            <Popup>Tu ubicación</Popup>
-          </Marker>
-        )}
+        <Marker position={center} icon={customIcon}>
+          <Popup>Tu ubicación</Popup>
+        </Marker>
         {sucursales.map((suc) => (
           <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={customIcon}>
             <Popup>

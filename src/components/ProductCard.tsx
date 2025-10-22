@@ -15,11 +15,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick, className 
     onClick={onClick}
   >
     <div className="flex items-center h-full">
-      <img
-        src={fotoUrl || producto.imagen_local || "/assets/placeholders/product.png"}
-        alt={producto.productos_descripcion}
-        className="h-14 w-14 object-contain rounded bg-gray-100 mr-2 flex-shrink-0"
-      />
+      {fotoUrl || producto.imagen_local ? (
+        <img
+          src={fotoUrl || producto.imagen_local}
+          alt={producto.productos_descripcion}
+          className="h-14 w-14 object-contain rounded bg-gray-100 mr-2 flex-shrink-0"
+        />
+      ) : (
+        <div className="h-14 w-14 flex items-center justify-center rounded bg-gray-100 mr-2 flex-shrink-0 border border-dashed border-gray-300">
+          <svg width="32" height="32" fill="none" viewBox="0 0 32 32">
+            <rect x="6" y="6" width="20" height="20" rx="4" fill="#e5e7eb" stroke="#a1a1aa" strokeWidth="2" />
+            <path d="M16 10v8M12 14h8" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
       <div className="flex flex-col justify-between flex-1 min-w-0 h-full">
         <div className="flex items-center gap-2">
           <span className="text-primary font-bold text-lg truncate max-w-[6rem]" title={producto.productos_precio_lista.toFixed(2)}>
