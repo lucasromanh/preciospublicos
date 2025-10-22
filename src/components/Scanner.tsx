@@ -46,8 +46,9 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
 
   return (
     <div className="w-full flex flex-col items-center">
-      <video ref={videoRef} className="rounded shadow w-full max-w-xs aspect-video bg-black" autoPlay muted playsInline />
-      <p className="text-xs text-gray-500 mt-2">Apunta la cámara al código de barras</p>
+      <video ref={videoRef} className="rounded shadow w-full max-w-xs aspect-video bg-black min-h-[220px] min-w-[180px]" style={{minHeight:220, minWidth:180}} autoPlay muted playsInline />
+      <p className="text-base text-primary font-semibold mt-2">Apunta la cámara al código de barras</p>
+      <p className="text-xs text-gray-500">Asegúrate de que el código esté bien iluminado y visible</p>
     </div>
   );
 };

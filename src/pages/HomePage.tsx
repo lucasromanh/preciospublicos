@@ -586,7 +586,7 @@ const HomePage: React.FC = () => {
               <div className="mb-4 flex flex-col gap-2">
                 <button
                   className="bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary w-fit"
-                  onClick={() => setShowPhoto(true)}
+                  onClick={e => { e.stopPropagation(); setShowPhoto(true); }}
                 >
                   Tomar foto de ticket o producto
                 </button>
