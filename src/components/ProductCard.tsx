@@ -5,15 +5,16 @@ interface ProductCardProps {
   producto: Producto;
   onClick?: () => void;
   className?: string;
+  fotoUrl?: string;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick, className = "" }) => (
+const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick, className = "", fotoUrl }) => (
   <div className={`bg-white dark:bg-gray-800 rounded shadow p-4 flex flex-col gap-2 cursor-pointer hover:ring-2 hover:ring-primary ${className}`}
     onClick={onClick}
   >
     <div className="flex items-center gap-4">
       <img
-        src={producto.imagen_local || "/assets/placeholders/product.png"}
+        src={fotoUrl || producto.imagen_local || "/assets/placeholders/product.png"}
         alt={producto.productos_descripcion}
         className="h-16 w-16 object-contain rounded bg-gray-100"
       />
