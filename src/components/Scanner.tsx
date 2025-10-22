@@ -12,12 +12,17 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
 
   useEffect(() => {
     codeReader.current = new BrowserMultiFormatReader();
+  // No usamos controls.stream, obtendremos el stream desde el videoRef
     const startScanner = async () => {
       try {
         const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
         if (videoInputDevices.length === 0) throw new Error("No se detectó cámara");
+        // Buscar cámara trasera (environment)
+        let backCamera = videoInputDevices.find(d => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("environment"));
+        const deviceId = backCamera ? backCamera.deviceId : videoInputDevices[videoInputDevices.length - 1].deviceId;
+        // Guardar el stream para poder pararlo manualmente
         await codeReader.current!.decodeFromVideoDevice(
-          videoInputDevices[0].deviceId,
+          deviceId,
           videoRef.current!,
           (result, err) => {
             if (result) {
@@ -33,6 +38,13 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
     };
     startScanner();
     return () => {
+      // Detener el stream de la cámara si existe
+      const video = videoRef.current;
+      if (video && video.srcObject) {
+        const stream = video.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
       // reset() existe en la mayoría de versiones, close() en otras
       if (codeReader.current) {
         if (typeof (codeReader.current as any).close === 'function') {
@@ -46,7 +58,14 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
 
   return (
     <div className="w-full flex flex-col items-center">
-      <video ref={videoRef} className="rounded shadow w-full max-w-xs aspect-video bg-black min-h-[220px] min-w-[180px]" style={{minHeight:220, minWidth:180}} autoPlay muted playsInline />
+      <video
+        ref={videoRef}
+        className="rounded shadow w-full max-w-md aspect-video bg-black min-h-[260px] min-w-[220px] sm:min-h-[320px] sm:min-w-[260px]"
+        style={{ minHeight: 260, minWidth: 220 }}
+        autoPlay
+        muted
+        playsInline
+      />
       <p className="text-base text-primary font-semibold mt-2">Apunta la cámara al código de barras</p>
       <p className="text-xs text-gray-500">Asegúrate de que el código esté bien iluminado y visible</p>
     </div>

@@ -25,28 +25,70 @@ interface MapViewProps {
 }
 
 const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
-  const [center, setCenter] = React.useState(userLocation || { lat: -34.6037, lng: -58.3816 });
-  useEffect(() => {
-    if (!userLocation && navigator.geolocation) {
+  const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(userLocation || null);
+  const [geoError, setGeoError] = React.useState<string | null>(null);
+  const [loadingGeo, setLoadingGeo] = React.useState(false);
+
+  const pedirUbicacion = () => {
+    setLoadingGeo(true);
+    setGeoError(null);
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {},
-        { enableHighAccuracy: true, timeout: 5000 }
+        pos => {
+          setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLoadingGeo(false);
+        },
+        err => {
+          setGeoError("No se pudo obtener tu ubicación. ¿Diste permisos?");
+          setLoadingGeo(false);
+        },
+        { enableHighAccuracy: true, timeout: 7000 }
       );
+    } else {
+      setGeoError("El navegador no soporta geolocalización");
+      setLoadingGeo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!userLocation && !center) {
+      pedirUbicacion();
     } else if (userLocation) {
       setCenter(userLocation);
     }
+    // eslint-disable-next-line
   }, [userLocation]);
+
   return (
-    <div className="w-full h-48 rounded overflow-hidden">
-      <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }}>
+    <div className="w-full h-56 rounded overflow-hidden relative">
+      {geoError && (
+        <div className="absolute z-20 left-0 right-0 top-0 bg-red-100 text-red-700 text-xs p-2 text-center">
+          {geoError}
+        </div>
+      )}
+      {!center && !loadingGeo && (
+        <button
+          className="absolute z-20 left-1/2 -translate-x-1/2 top-2 bg-primary text-white px-3 py-1 rounded shadow text-xs font-semibold"
+          onClick={pedirUbicacion}
+        >
+          Obtener mi ubicación
+        </button>
+      )}
+      {loadingGeo && (
+        <div className="absolute z-20 left-0 right-0 top-0 bg-blue-100 text-blue-700 text-xs p-2 text-center">
+          Buscando ubicación...
+        </div>
+      )}
+      <MapContainer center={center || { lat: -34.6037, lng: -58.3816 }} zoom={13} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={center} icon={customIcon}>
-          <Popup>Tu ubicación</Popup>
-        </Marker>
+        {center && (
+          <Marker position={center} icon={customIcon}>
+            <Popup>Tu ubicación</Popup>
+          </Marker>
+        )}
         {sucursales.map((suc) => (
           <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={customIcon}>
             <Popup>
