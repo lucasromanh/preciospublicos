@@ -150,10 +150,11 @@ export function calcularTotalesCarritoSEPA(
 // const totales = calcularTotalesCarritoSEPA(carrito, productos, sucursales, preciosPorSucursal);
 // const mejor = totales.filter(t => t.faltantes === 0).sort((a, b) => a.total - b.total)[0];
 // --- FIN UTILIDADES SEPA ---
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import SearchBar from "../components/SearchBar";
+import { getComparaciones } from "../services/apiService";
 import ProductCard from "../components/ProductCard";
 import Scanner from "../components/Scanner";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -212,6 +213,9 @@ const fotosEjemplo = [
 
 const HomePage: React.FC = () => {
   const [search, setSearch] = useState("");
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [sugerencias, setSugerencias] = useState<any[]>([]);
+  const [loadingBusqueda, setLoadingBusqueda] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
@@ -225,41 +229,57 @@ const HomePage: React.FC = () => {
   // Referencia para input de archivo (carga de foto)
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [productoParaFoto, setProductoParaFoto] = useState<string | null>(null);
-  const productos: Producto[] = [
-    {
-      id_producto: 'p1',
-      productos_ean: 1,
-      productos_descripcion: "Leche entera 1L",
-      productos_marca: "La Serenísima",
-      productos_cantidad_presentacion: "1",
-      productos_unidad_medida_presentacion: "L",
-      productos_precio_lista: 212.5,
-      productos_precio_referencia: 0,
-      productos_unidad_medida_referencia: "L"
-    },
-    {
-      id_producto: 'p2',
-      productos_ean: 1,
-      productos_descripcion: "Yerba mate 1kg",
-      productos_marca: "Taragüi",
-      productos_cantidad_presentacion: "1",
-      productos_unidad_medida_presentacion: "kg",
-      productos_precio_lista: 1500,
-      productos_precio_referencia: 0,
-      productos_unidad_medida_referencia: "kg"
-    },
-    {
-      id_producto: 'p3',
-      productos_ean: 1,
-      productos_descripcion: "Aceite girasol 900ml",
-      productos_marca: "Cocinero",
-      productos_cantidad_presentacion: "900",
-      productos_unidad_medida_presentacion: "ml",
-      productos_precio_lista: 950,
-      productos_precio_referencia: 0,
-      productos_unidad_medida_referencia: "ml"
-    },
-  ];
+
+  // Buscar productos reales al escribir
+  useEffect(() => {
+    if (search.length < 2) {
+      setSugerencias([]);
+      return;
+    }
+    let cancelado = false;
+    setLoadingBusqueda(true);
+    getComparaciones(search)
+      .then(res => {
+        if (!cancelado) setSugerencias(res);
+      })
+      .catch(() => setSugerencias([]))
+      .finally(() => setLoadingBusqueda(false));
+    return () => { cancelado = true; };
+  }, [search]);
+
+  // Al seleccionar una sugerencia, mostrarla como producto principal
+  const handleSugerenciaClick = (sug: any) => {
+    setSearch(sug.productos_descripcion);
+    setSugerencias([]);
+    setProductos([{
+      id_producto: sug.id_producto,
+      productos_ean: 0,
+      productos_descripcion: sug.productos_descripcion,
+      productos_marca: sug.productos_marca,
+      productos_cantidad_presentacion: '',
+      productos_unidad_medida_presentacion: '',
+      productos_precio_lista: sug.precio_min,
+      productos_precio_referencia: sug.precio_promedio,
+      productos_unidad_medida_referencia: '',
+      productos_categoria: '',
+      productos_leyenda_promo1: '',
+      productos_leyenda_promo2: '',
+    }]);
+    setProductoSeleccionado({
+      id_producto: sug.id_producto,
+      productos_ean: 0,
+      productos_descripcion: sug.productos_descripcion,
+      productos_marca: sug.productos_marca,
+      productos_cantidad_presentacion: '',
+      productos_unidad_medida_presentacion: '',
+      productos_precio_lista: sug.precio_min,
+      productos_precio_referencia: sug.precio_promedio,
+      productos_unidad_medida_referencia: '',
+      productos_categoria: '',
+      productos_leyenda_promo1: '',
+      productos_leyenda_promo2: '',
+    });
+  };
 
   // Precios por sucursal (simulado)
   // Estructura: { [id_sucursal]: { [id_producto]: precio } }
@@ -428,7 +448,25 @@ const HomePage: React.FC = () => {
         {/* Contenido de cada tab */}
         {tab === 'inicio' && (
           <>
-            <SearchBar value={search} onChange={setSearch} />
+            <div className="relative">
+              <SearchBar value={search} onChange={setSearch} />
+              {sugerencias.length > 0 && (
+                <ul className="absolute z-20 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded w-full mt-1 max-h-56 overflow-y-auto shadow-lg">
+                  {sugerencias.map((sug, i) => (
+                    <li
+                      key={sug.id_producto + i}
+                      className="px-3 py-2 cursor-pointer hover:bg-primary/10"
+                      onClick={() => handleSugerenciaClick(sug)}
+                    >
+                      <div className="font-semibold text-sm text-primary">{sug.productos_descripcion}</div>
+                      <div className="text-xs text-gray-500">{sug.productos_marca}</div>
+                      <div className="text-xs text-gray-400">${sug.precio_min?.toFixed(2)} - ${sug.precio_max?.toFixed(2)}</div>
+                    </li>
+                  ))}
+                  {loadingBusqueda && <li className="px-3 py-2 text-xs text-gray-400">Buscando...</li>}
+                </ul>
+              )}
+            </div>
             {showScanner && (
               <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
                 <div className="bg-white dark:bg-gray-800 rounded shadow-lg p-4 max-w-xs w-full flex flex-col items-center">
