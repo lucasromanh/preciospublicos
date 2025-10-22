@@ -496,36 +496,39 @@ const HomePage: React.FC = () => {
             )}
             <section>
               <h2 className="font-bold text-lg mb-2">Productos más consultados</h2>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 min-h-[220px]">
                 {productos.length === 0 ? <LoadingSpinner /> : productos.map((p) => {
                   const foto = obtenerFotoProducto(p.id_producto);
                   return (
-                    <div key={p.id_producto} className="relative group">
+                    <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
                       <ProductCard
                         producto={p}
                         onClick={() => setProductoSeleccionado(p)}
                         className={productoSeleccionado?.id_producto === p.id_producto ? "ring-2 ring-primary" : ""}
+                        fotoUrl={foto || undefined}
                       />
-                      <button
-                        className={`absolute top-2 right-2 text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
-                        title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                        onClick={e => {
-                          e.stopPropagation();
-                          setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
-                        }}
-                      >
-                        {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                      </button>
-                      <button
-                        className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
-                        title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
-                        onClick={e => {
-                          e.stopPropagation();
-                          setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
-                        }}
-                      >
-                        {carrito.includes(p.id_producto) ? 'En carrito' : 'Agregar'}
-                      </button>
+                      <div className="flex justify-between items-center mt-2 gap-2">
+                        <button
+                          className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
+                          title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
+                          }}
+                        >
+                          {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                        </button>
+                        <button
+                          className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                          title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
+                          onClick={e => {
+                            e.stopPropagation();
+                            setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
+                          }}
+                        >
+                          {carrito.includes(p.id_producto) ? 'En carrito' : 'Agregar'}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -602,33 +605,35 @@ const HomePage: React.FC = () => {
               {productosBaratos.map((p) => {
                 const foto = obtenerFotoProducto(p.id_producto);
                 return (
-                  <div key={p.id_producto} className="relative group">
+                  <div key={p.id_producto} className="relative group flex flex-col h-full">
                     <ProductCard
                       producto={p}
                       onClick={() => setProductoSeleccionado(p)}
                       className={productoSeleccionado?.id_producto === p.id_producto ? "ring-2 ring-primary" : ""}
                       fotoUrl={foto || undefined}
                     />
-                    <button
-                      className={`absolute top-2 right-2 text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
-                      title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                      onClick={e => {
-                        e.stopPropagation();
-                        setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
-                      }}
-                    >
-                      {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                    </button>
-                    <button
-                      className={`absolute bottom-2 right-2 text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
-                      title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
-                      onClick={e => {
-                        e.stopPropagation();
-                        setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
-                      }}
-                    >
-                      {carrito.includes(p.id_producto) ? 'En carrito' : 'Agregar'}
-                    </button>
+                    <div className="flex justify-between items-center mt-2 gap-2">
+                      <button
+                        className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
+                        title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
+                        }}
+                      >
+                        {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                      </button>
+                      <button
+                        className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                        title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
+                        }}
+                      >
+                        {carrito.includes(p.id_producto) ? 'En carrito' : 'Agregar'}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
