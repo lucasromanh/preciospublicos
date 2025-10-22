@@ -533,9 +533,41 @@ const HomePage: React.FC = () => {
               </div>
             )}
             <section>
-              <h2 className="font-bold text-lg mb-2">Productos más consultados</h2>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-bold text-lg">Productos más consultados</h2>
+                <button
+                  className="text-xs px-3 py-1 rounded bg-primary text-white hover:bg-primary-dark"
+                  onClick={async () => {
+                    setLoadingBusqueda(true);
+                    try {
+                      const res = await getComparaciones();
+                      setProductos(res.map((sug: any) => ({
+                        id_producto: sug.id_producto,
+                        productos_ean: 0,
+                        productos_descripcion: sug.productos_descripcion,
+                        productos_marca: sug.productos_marca,
+                        productos_cantidad_presentacion: '',
+                        productos_unidad_medida_presentacion: '',
+                        productos_precio_lista: sug.precio_min,
+                        productos_precio_referencia: sug.precio_promedio,
+                        productos_unidad_medida_referencia: '',
+                        productos_categoria: '',
+                        productos_leyenda_promo1: '',
+                        productos_leyenda_promo2: '',
+                      })));
+                    } catch {}
+                    setLoadingBusqueda(false);
+                  }}
+                >
+                  Ver productos del backend
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2 min-h-[220px]">
-                {productos.length === 0 ? <LoadingSpinner /> : productos.map((p) => {
+                {loadingBusqueda ? (
+                  <LoadingSpinner />
+                ) : productos.length === 0 ? (
+                  <div className="text-gray-400 text-center py-4 col-span-2">Aún no se agregaron productos consultados.</div>
+                ) : productos.map((p) => {
                   const foto = obtenerFotoProducto(p.id_producto);
                   return (
                     <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
@@ -631,7 +663,11 @@ const HomePage: React.FC = () => {
                 <span className="text-xs text-gray-400">Puedes tomar una foto de un ticket o producto para guardarla localmente.</span>
               </div>
               <div className="mb-4">
-                <LoadingSpinner />
+                {loadingBusqueda ? (
+                  <LoadingSpinner />
+                ) : (
+                  <div className="text-gray-400 text-center py-4">Aún no se han consultado productos ni tickets.</div>
+                )}
               </div>
             </section>
           </>
