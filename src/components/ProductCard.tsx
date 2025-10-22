@@ -4,10 +4,13 @@ import { Producto } from "../types/Producto";
 interface ProductCardProps {
   producto: Producto;
   onClick?: () => void;
+  className?: string;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick }) => (
-  <div className="bg-white dark:bg-gray-800 rounded shadow p-4 flex flex-col gap-2 cursor-pointer hover:ring-2 hover:ring-primary" onClick={onClick}>
+const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick, className = "" }) => (
+  <div className={`bg-white dark:bg-gray-800 rounded shadow p-4 flex flex-col gap-2 cursor-pointer hover:ring-2 hover:ring-primary ${className}`}
+    onClick={onClick}
+  >
     <div className="flex items-center gap-4">
       <img
         src={producto.imagen_local || "/assets/placeholders/product.png"}
