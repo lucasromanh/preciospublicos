@@ -1,6 +1,6 @@
 
 import React, { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 // @ts-ignore
 import "leaflet/dist/leaflet.css";
 import { Sucursal } from "../types/Sucursal";
@@ -42,6 +42,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   const [loadingGeo, setLoadingGeo] = React.useState(false);
 
   const pedirUbicacion = () => {
+    console.log('pedirUbicacion llamado desde MapView');
     setLoadingGeo(true);
     setGeoError(null);
     if (navigator.geolocation) {
@@ -72,19 +73,72 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     // eslint-disable-next-line
   }, [userLocation]);
 
+  // Componente interno para agregar control dentro del MapContainer (usa useMap)
+  const MapControls: React.FC<{ onLocate: () => void }> = ({ onLocate }) => {
+    const map = useMap();
+    useEffect(() => {
+      const CustomControl = L.Control.extend({
+        onAdd: function () {
+          const container = L.DomUtil.create('div', 'leaflet-bar custom-location-control');
+          container.style.background = 'white';
+          container.style.padding = '6px';
+          container.style.cursor = 'pointer';
+          container.style.borderRadius = '4px';
+          container.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
+          container.style.fontSize = '18px';
+          container.title = 'Obtener mi ubicación';
+          container.setAttribute('role', 'button');
+          (container as HTMLElement).tabIndex = 0;
+          container.innerHTML = '📍';
+          // evitar que el mapa reciba los eventos
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.disableScrollPropagation(container);
+          L.DomEvent.on(container, 'click', function (e: any) {
+            L.DomEvent.stopPropagation(e);
+            console.log('control click');
+            onLocate();
+          });
+          L.DomEvent.on(container, 'touchend', function (e: any) {
+            L.DomEvent.stopPropagation(e);
+            console.log('control touchend');
+            onLocate();
+          });
+          // support keyboard
+          L.DomEvent.on(container, 'keydown', function (e: any) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              L.DomEvent.stopPropagation(e);
+              console.log('control keydown');
+              onLocate();
+            }
+          });
+          return container;
+        }
+      });
+      const control = new CustomControl({ position: 'bottomright' });
+      control.addTo(map);
+      return () => {
+        control.remove();
+      };
+    }, [map, onLocate]);
+    return null;
+  };
+
     return (
     <div className="w-full h-56 rounded overflow-hidden relative" style={{ zIndex: 0 }}>
-        {geoError && (
-          <div className="absolute z-20 left-0 right-0 top-0 bg-red-100 text-red-700 text-xs p-2 text-center">
-            {geoError}
-          </div>
-        )}
-        {loadingGeo && (
-          <div className="absolute z-20 left-0 right-0 top-0 bg-blue-100 text-blue-700 text-xs p-2 text-center">
-            Buscando ubicación...
-          </div>
-        )}
+      {geoError && (
+        <div className="absolute z-20 left-0 right-0 top-0 bg-red-100 text-red-700 text-xs p-2 text-center">
+          {geoError}
+        </div>
+      )}
+      {loadingGeo && (
+        <div className="absolute z-20 left-0 right-0 top-0 bg-blue-100 text-blue-700 text-xs p-2 text-center">
+          Buscando ubicación...
+        </div>
+      )}
+      <div className="relative w-full h-full">
         <MapContainer center={center || { lat: -34.6037, lng: -58.3816 }} zoom={13} style={{ height: "100%", width: "100%" }}>
+          {/* Control dentro del mapa para forzar ubicación */}
+          <MapControls onLocate={pedirUbicacion} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -104,18 +158,18 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
             </Marker>
           ))}
         </MapContainer>
-        {/* Botón flotante para forzar ubicación */}
-        <div className="pointer-events-none">
-          <button
-            className="absolute bottom-3 right-3 z-50 bg-primary text-white rounded-full shadow-lg px-3 py-2 text-xs sm:text-sm font-semibold hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary pointer-events-auto"
-            onClick={pedirUbicacion}
-            title="Obtener mi ubicación"
-            style={{minWidth: 44, minHeight: 44, padding: '0.5rem 1rem'}}
-          >
-            📍 Mi ubicación
-          </button>
-        </div>
       </div>
+      <div className="w-full flex justify-center mt-2">
+        <button
+          className="bg-primary text-white rounded-full shadow-lg px-4 py-2 text-sm font-semibold hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+          onClick={pedirUbicacion}
+          title="Obtener mi ubicación"
+          style={{minWidth: 44, minHeight: 44}}
+        >
+          📍 Mi ubicación
+        </button>
+      </div>
+    </div>
     );
 };
 
