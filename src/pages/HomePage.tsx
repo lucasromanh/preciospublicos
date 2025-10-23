@@ -481,11 +481,39 @@ const HomePage: React.FC = () => {
               )}
             </div>
             {showScanner && (
-              <div className="fixed inset-0 bg-black bg-opacity-90 z-[100] flex items-center justify-center">
-                <div className="bg-white dark:bg-gray-900 rounded-none shadow-none p-0 w-full h-full flex flex-col items-center justify-center">
+              <div className="fixed inset-0 bg-black bg-opacity-90 z-[1000] flex items-center justify-center">
+                <div className="bg-white dark:bg-gray-900 rounded-none shadow-none p-0 w-full h-full flex flex-col items-center justify-center relative">
+                  <button
+                    className="absolute top-4 right-4 z-[1100] bg-primary text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg text-2xl focus:outline-none focus:ring-2 focus:ring-primary"
+                    style={{opacity:0.95}}
+                    onClick={() => {
+                      // Forzar cierre de cámara
+                      const videos = document.querySelectorAll('video');
+                      videos.forEach(video => {
+                        if (video.srcObject) {
+                          const stream = video.srcObject as MediaStream;
+                          stream.getTracks().forEach(track => track.stop());
+                          video.srcObject = null;
+                        }
+                      });
+                      setShowScanner(false);
+                    }}
+                    aria-label="Cerrar escáner"
+                  >
+                    ×
+                  </button>
                   <Scanner onDetected={(code) => {
                     // Buscar producto por código (id_producto)
                     const prod = productos.find(p => String(p.id_producto) === String(code));
+                    // Forzar cierre de cámara
+                    const videos = document.querySelectorAll('video');
+                    videos.forEach(video => {
+                      if (video.srcObject) {
+                        const stream = video.srcObject as MediaStream;
+                        stream.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                      }
+                    });
                     setShowScanner(false);
                     if (prod) {
                       setProductoSeleccionado(prod);
@@ -525,7 +553,18 @@ const HomePage: React.FC = () => {
                   )}
                   <button
                     className="mt-4 w-full rounded py-2 font-semibold bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
-                    onClick={() => setShowScanner(false)}
+                    onClick={() => {
+                      // Forzar cierre de cámara
+                      const videos = document.querySelectorAll('video');
+                      videos.forEach(video => {
+                        if (video.srcObject) {
+                          const stream = video.srcObject as MediaStream;
+                          stream.getTracks().forEach(track => track.stop());
+                          video.srcObject = null;
+                        }
+                      });
+                      setShowScanner(false);
+                    }}
                   >
                     Cerrar
                   </button>

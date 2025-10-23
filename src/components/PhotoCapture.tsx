@@ -11,7 +11,15 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture }) => {
 
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Buscar la cámara trasera (como en el Scanner)
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      let backCamera = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+      const deviceId = backCamera ? backCamera.deviceId : (videoDevices[videoDevices.length - 1]?.deviceId);
+      const constraints = deviceId
+        ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
+      const s = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(s);
       if (videoRef.current) videoRef.current.srcObject = s;
       setCapturing(true);
@@ -38,12 +46,19 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture }) => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 w-full">
       {!capturing ? (
         <button onClick={startCamera} className="bg-primary text-white px-4 py-2 rounded shadow">Activar cámara</button>
       ) : (
         <>
-          <video ref={videoRef} autoPlay className="rounded shadow w-full max-w-xs aspect-video bg-black" />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="rounded shadow w-full h-[40vh] max-w-full aspect-video bg-black object-contain"
+            style={{ minHeight: 220, background: 'black' }}
+          />
           <div className="flex gap-2 mt-2">
             <button onClick={takePhoto} className="bg-green-600 text-white px-4 py-2 rounded">Capturar</button>
             <button onClick={stopCamera} className="bg-gray-400 text-white px-4 py-2 rounded">Cancelar</button>
