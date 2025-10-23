@@ -574,7 +574,7 @@ const HomePage: React.FC = () => {
             {showPhoto && (
               <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
                 <div className="bg-white dark:bg-gray-800 rounded shadow-lg p-4 max-w-xs w-full flex flex-col items-center">
-                  <PhotoCapture onCapture={() => setShowPhoto(false)} />
+                  <PhotoCapture autoStart onCapture={() => setShowPhoto(false)} />
                   <button
                     className="mt-4 w-full rounded py-2 font-semibold bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
                     onClick={() => setShowPhoto(false)}

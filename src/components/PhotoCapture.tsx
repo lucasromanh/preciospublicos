@@ -2,15 +2,17 @@ import React, { useRef, useState } from "react";
 
 interface PhotoCaptureProps {
   onCapture: (dataUrl: string) => void;
+  autoStart?: boolean;
 }
 
-const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture }) => {
+const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, autoStart }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturing, setCapturing] = useState(false);
 
   const startCamera = async () => {
     try {
+      if (stream) return; // ya iniciado
       // Buscar la cámara trasera (como en el Scanner)
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(d => d.kind === 'videoinput');
@@ -27,6 +29,18 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture }) => {
       alert("No se pudo acceder a la cámara");
     }
   };
+
+  // Auto-start si se solicita
+  React.useEffect(() => {
+    if (autoStart) {
+      // pequeño timeout para dejar que el modal haga paint en iOS
+      const t = setTimeout(() => {
+        startCamera();
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   const takePhoto = () => {
     if (!videoRef.current) return;
@@ -48,7 +62,11 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture }) => {
   return (
     <div className="flex flex-col items-center gap-2 w-full">
       {!capturing ? (
-        <button onClick={startCamera} className="bg-primary text-white px-4 py-2 rounded shadow">Activar cámara</button>
+        autoStart ? (
+          <div className="text-sm text-gray-500">Pidiendo cámara...</div>
+        ) : (
+          <button onClick={startCamera} className="bg-primary text-white px-4 py-2 rounded shadow">Activar cámara</button>
+        )
       ) : (
         <>
           <video

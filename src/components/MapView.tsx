@@ -40,6 +40,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(userLocation || null);
   const [geoError, setGeoError] = React.useState<string | null>(null);
   const [loadingGeo, setLoadingGeo] = React.useState(false);
+  const [radiusKm, setRadiusKm] = React.useState<number>(3);
 
   const pedirUbicacion = () => {
     console.log('pedirUbicacion llamado desde MapView');
@@ -123,6 +124,42 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     return null;
   };
 
+  // Helper: distancia en km entre dos coordenadas (Haversine)
+  const distanciaKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const toRad = (deg: number) => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Calcular sucursales con distancia y ordenar por cercanía
+  const sucursalesConDistancia = React.useMemo(() => {
+    if (!center) return [] as Array<any>;
+    return sucursales.map(s => ({
+      suc: s,
+      distancia: distanciaKm(center.lat, center.lng, s.sucursales_latitud, s.sucursales_longitud)
+    })).sort((a,b) => a.distancia - b.distancia);
+  }, [sucursales, center]);
+
+  const cercanas = sucursalesConDistancia.filter(s => s.distancia <= radiusKm).slice(0, 10);
+  const top5 = sucursalesConDistancia.slice(0,5);
+
+  // Icono verde para sucursales cercanas
+  const svgNear = encodeURIComponent(`
+  <svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41' fill='none'>
+  <path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%2320c997'/>
+  </svg>`);
+  const nearIcon = new L.Icon({
+    iconUrl: `data:image/svg+xml,${svgNear}`,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [0, -41],
+    className: '',
+  });
+
     return (
     <div className="w-full h-56 rounded overflow-hidden relative" style={{ zIndex: 0 }}>
       {geoError && (
@@ -139,6 +176,15 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         <MapContainer center={center || { lat: -34.6037, lng: -58.3816 }} zoom={13} style={{ height: "100%", width: "100%" }}>
           {/* Control dentro del mapa para forzar ubicación */}
           <MapControls onLocate={pedirUbicacion} />
+          {/* Selector de radio (UI overlay) */}
+          <div className="absolute top-2 right-2 z-40 bg-white rounded shadow p-2 text-xs">
+            <label className="block text-gray-600 text-xs mb-1">Radio (km)</label>
+            <select value={radiusKm} onChange={e => setRadiusKm(Number(e.target.value))} className="text-sm">
+              <option value={1}>1 km</option>
+              <option value={3}>3 km</option>
+              <option value={5}>5 km</option>
+            </select>
+          </div>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -148,12 +194,13 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
               <Popup>Tu ubicación</Popup>
             </Marker>
           )}
-          {sucursales.map((suc) => (
-            <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={shopIcon}>
+          {sucursalesConDistancia.map(({ suc, distancia }: any) => (
+            <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={distancia <= radiusKm ? nearIcon : shopIcon}>
               <Popup>
                 <span className="font-bold">{suc.sucursales_nombre}</span><br />
                 {suc.sucursales_tipo && <span className="text-xs text-gray-500">{suc.sucursales_tipo}</span>}<br />
                 {suc.sucursales_calle} {suc.sucursales_numero}
+                <div className="text-xs text-gray-500 mt-1">{distancia.toFixed(2)} km</div>
               </Popup>
             </Marker>
           ))}
@@ -168,6 +215,29 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         >
           📍 Mi ubicación
         </button>
+      </div>
+      {/* Lista top5 sucursales */}
+      <div className="mt-3">
+        <h3 className="font-semibold text-sm mb-2">Sucursales más cercanas</h3>
+        {top5.length === 0 ? (
+          <div className="text-xs text-gray-500">No hay sucursales cerca (o aún no se obtuvo tu ubicación).</div>
+        ) : (
+          <ul className="space-y-2">
+            {top5.map((item: any) => (
+              <li key={item.suc.id_sucursal} className="flex items-center justify-between bg-white p-2 rounded shadow-sm">
+                <div>
+                  <div className="font-semibold text-sm">{item.suc.sucursales_nombre}</div>
+                  <div className="text-xs text-gray-500">{item.suc.sucursales_calle} {item.suc.sucursales_numero} — {item.distancia.toFixed(2)} km</div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button className="bg-primary text-white text-xs px-2 py-1 rounded" onClick={() => { setCenter({ lat: item.suc.sucursales_latitud, lng: item.suc.sucursales_longitud }); }}>
+                    Centrar
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
     );
