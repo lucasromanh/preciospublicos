@@ -13,9 +13,9 @@ const svgUser = encodeURIComponent(`
 </svg>`);
 const userIcon = new L.Icon({
   iconUrl: `data:image/svg+xml,${svgUser}`,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [0, -41],
+  iconSize: [36, 58],
+  iconAnchor: [18, 58],
+  popupAnchor: [0, -58],
   className: '',
 });
 // Icono naranja para sucursales
@@ -25,9 +25,9 @@ const svgShop = encodeURIComponent(`
 </svg>`);
 const shopIcon = new L.Icon({
   iconUrl: `data:image/svg+xml,${svgShop}`,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [0, -41],
+  iconSize: [36, 58],
+  iconAnchor: [18, 58],
+  popupAnchor: [0, -58],
   className: '',
 });
 
@@ -42,24 +42,45 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   const [loadingGeo, setLoadingGeo] = React.useState(false);
   const [radiusKm, setRadiusKm] = React.useState<number>(3);
 
-  const pedirUbicacion = () => {
-    console.log('pedirUbicacion llamado desde MapView');
+  const pedirUbicacion = async () => {
+    console.log('📍 Solicitando ubicación desde MapView...');
     setLoadingGeo(true);
     setGeoError(null);
-    if (navigator.geolocation) {
+
+    if (!navigator.geolocation) {
+      setGeoError("Tu dispositivo no soporta geolocalización");
+      setLoadingGeo(false);
+      return;
+    }
+
+    try {
+      // Comprobar permisos si está disponible
+      if ((navigator as any).permissions) {
+        try {
+          const perm = await (navigator as any).permissions.query({ name: "geolocation" });
+          console.log("Permiso actual de GPS:", perm.state);
+        } catch (permErr) {
+          console.warn('No se pudo consultar la API de permisos:', permErr);
+        }
+      }
+
       navigator.geolocation.getCurrentPosition(
         pos => {
-          setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          console.log("✅ Coordenadas obtenidas:", coords);
+          setCenter(coords);
           setLoadingGeo(false);
         },
         err => {
-          setGeoError("No se pudo obtener tu ubicación. ¿Diste permisos?");
+          console.warn("❌ Error GPS:", err);
+          setGeoError("No se pudo obtener tu ubicación (verifica permisos de GPS)");
           setLoadingGeo(false);
         },
-        { enableHighAccuracy: true, timeout: 7000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
-    } else {
-      setGeoError("El navegador no soporta geolocalización");
+    } catch (error) {
+      console.error("Error solicitando ubicación:", error);
+      setGeoError("Ocurrió un error al obtener la ubicación.");
       setLoadingGeo(false);
     }
   };
@@ -154,11 +175,21 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   </svg>`);
   const nearIcon = new L.Icon({
     iconUrl: `data:image/svg+xml,${svgNear}`,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [0, -41],
+    iconSize: [36, 58],
+    iconAnchor: [18, 58],
+    popupAnchor: [0, -58],
     className: '',
   });
+
+  // Sincronizar el centro con el mapa haciendo panTo para evitar problemas de no refrescar
+  const SyncCenter: React.FC<{ center: { lat: number; lng: number } | null }> = ({ center }) => {
+    const map = useMap();
+    useEffect(() => {
+      if (center) map.setView([center.lat, center.lng], map.getZoom(), { animate: true });
+      // eslint-disable-next-line
+    }, [center]);
+    return null;
+  };
 
     return (
     <div className="w-full h-56 rounded overflow-hidden relative" style={{ zIndex: 0 }}>
@@ -176,6 +207,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         <MapContainer center={center || { lat: -34.6037, lng: -58.3816 }} zoom={13} style={{ height: "100%", width: "100%" }}>
           {/* Control dentro del mapa para forzar ubicación */}
           <MapControls onLocate={pedirUbicacion} />
+          <SyncCenter center={center} />
           {/* Selector de radio (UI overlay) */}
           <div className="absolute top-2 right-2 z-40 bg-white rounded shadow p-2 text-xs">
             <label className="block text-gray-600 text-xs mb-1">Radio (km)</label>
@@ -190,12 +222,12 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {center && (
-            <Marker position={center} icon={userIcon}>
+            <Marker position={center} icon={userIcon} zIndexOffset={1000}>
               <Popup>Tu ubicación</Popup>
             </Marker>
           )}
           {sucursalesConDistancia.map(({ suc, distancia }: any) => (
-            <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={distancia <= radiusKm ? nearIcon : shopIcon}>
+            <Marker key={suc.id_sucursal} position={{ lat: suc.sucursales_latitud, lng: suc.sucursales_longitud }} icon={distancia <= radiusKm ? nearIcon : shopIcon} zIndexOffset={500}>
               <Popup>
                 <span className="font-bold">{suc.sucursales_nombre}</span><br />
                 {suc.sucursales_tipo && <span className="text-xs text-gray-500">{suc.sucursales_tipo}</span>}<br />

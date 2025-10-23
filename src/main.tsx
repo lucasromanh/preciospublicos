@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./tailwind.css";
+import "./index.css";
 
 // En desarrollo, desregistrar cualquier service worker previo
 if (location.hostname === "localhost" && 'serviceWorker' in navigator) {

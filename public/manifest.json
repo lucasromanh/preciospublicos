@@ -1,6 +1,6 @@
 {
   "name": "Precios Claros Argentina",
-  "short_name": "PreciosAR",
+  "short_name": "+Barato",
   "description": "Consulta y compara precios reales de supermercados argentinos (Sistema SEPA).",
   "start_url": "/",
   "display": "standalone",
@@ -18,5 +18,8 @@
     { "src": "/screenshots/home.png", "sizes": "540x720", "type": "image/png" }
   ],
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "permissions": [
+    "geolocation"
+  ]
 }

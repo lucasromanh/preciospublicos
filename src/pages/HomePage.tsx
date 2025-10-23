@@ -21,6 +21,47 @@ export function obtenerFotoProducto(id_producto: string): string | null {
   return localStorage.getItem('foto_' + id_producto);
 }
 
+// Guardar directamente un dataURL (cuando la captura viene desde la cámara)
+export async function guardarFotoProductoDataUrl(id_producto: string, dataUrl: string) {
+  localStorage.setItem('foto_' + id_producto, dataUrl);
+  return dataUrl;
+}
+
+// Galería local: guardamos un array en localStorage bajo 'galeria'
+type GaleriaItem = {
+  id: string;
+  tipo: 'ticket' | 'product';
+  productoId?: string;
+  nombre?: string;
+  dataUrl: string;
+  createdAt: string;
+};
+
+export function agregarAGaleria(item: Omit<GaleriaItem, 'id' | 'createdAt'>) {
+  try {
+    const prev = JSON.parse(localStorage.getItem('galeria') || '[]') as GaleriaItem[];
+    const nuevo: GaleriaItem = {
+      id: String(Date.now()) + Math.random().toString(36).slice(2, 8),
+      createdAt: new Date().toISOString(),
+      ...item,
+    } as GaleriaItem;
+    prev.unshift(nuevo);
+    localStorage.setItem('galeria', JSON.stringify(prev));
+    return nuevo;
+  } catch (e) {
+    console.error('Error guardando en galería', e);
+    return null;
+  }
+}
+
+export function obtenerGaleria(): GaleriaItem[] {
+  try {
+    return JSON.parse(localStorage.getItem('galeria') || '[]') as GaleriaItem[];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Cuando el usuario escanea un código de barras, puedes mostrar la foto así:
 // const foto = obtenerFotoProducto(id_producto);
 // if (foto) mostrar la imagen, si no, mostrar placeholder
@@ -204,12 +245,8 @@ const comparacionEjemplo: PriceRow[] = [
     ultimaActualizacion: "2025-10-20",
   },
 ];
-const fotosEjemplo = [
-  // URLs de ejemplo, puedes reemplazar por fotos reales
-  "/assets/placeholders/product.png",
-  "/assets/placeholders/product.png",
-  "/assets/placeholders/product.png"
-];
+// En HomePage mostraremos la galería local
+// const fotosEjemplo = [...]; // ahora usamos obtenerGaleria()
 
 const HomePage: React.FC = () => {
   // Estado para ubicación del usuario
@@ -233,6 +270,9 @@ const HomePage: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [productoSeleccionado, setProductoSeleccionado] = useState<Producto | null>(null);
+  const [showProductoModal, setShowProductoModal] = useState(false);
+  const [editingTicketNameForId, setEditingTicketNameForId] = useState<string | null>(null);
+  const [productoModalCapturando, setProductoModalCapturando] = useState(false);
   const [tab, setTab] = useState<'inicio'|'baratos'|'favoritos'|'galeria'>("inicio");
   const [showCarrito, setShowCarrito] = useState(false);
   const [favoritos, setFavoritos] = useState<string[]>([]); // ids de producto
@@ -502,7 +542,7 @@ const HomePage: React.FC = () => {
                   >
                     ×
                   </button>
-                  <Scanner onDetected={(code) => {
+                  <Scanner onDetected={(code: string) => {
                     // Buscar producto por código (id_producto)
                     const prod = productos.find(p => String(p.id_producto) === String(code));
                     // Forzar cierre de cámara
@@ -574,7 +614,13 @@ const HomePage: React.FC = () => {
             {showPhoto && (
               <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
                 <div className="bg-white dark:bg-gray-800 rounded shadow-lg p-4 max-w-xs w-full flex flex-col items-center">
-                  <PhotoCapture autoStart onCapture={() => setShowPhoto(false)} />
+                      <PhotoCapture autoStart onCapture={async (dataUrl) => {
+                        // Si estaba tomando una foto general (showPhoto), la guardamos en galería como 'ticket'
+                        agregarAGaleria({ tipo: 'ticket', dataUrl, nombre: 'Ticket sin nombre' });
+                        setShowPhoto(false);
+                        // Ir a galería
+                        setTab('galeria');
+                      }} />
                   <button
                     className="mt-4 w-full rounded py-2 font-semibold bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
                     onClick={() => setShowPhoto(false)}
@@ -621,13 +667,13 @@ const HomePage: React.FC = () => {
       <div className="text-gray-400 text-center py-4 col-span-2">Aún no se agregaron productos consultados.</div>
     ) : (
       <>
-        {productos.slice(0, verMasProductos).map((p) => {
+                {productos.slice(0, verMasProductos).map((p) => {
           const foto = obtenerFotoProducto(p.id_producto);
           return (
             <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
               <ProductCard
                 producto={p}
-                onClick={() => setProductoSeleccionado(p)}
+                onClick={() => { setProductoSeleccionado(p); setShowProductoModal(true); }}
                 className={productoSeleccionado?.id_producto === p.id_producto ? "ring-2 ring-primary" : ""}
                 fotoUrl={foto || undefined}
               />
@@ -668,32 +714,56 @@ const HomePage: React.FC = () => {
     )}
   </div>
               {/* Detalle de producto seleccionado */}
-              {productoSeleccionado && (
-                <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded shadow flex flex-col items-center">
-                  <div className="font-bold text-primary mb-1">{productoSeleccionado.productos_descripcion}</div>
-                  <div className="text-xs text-gray-500 mb-2">Código: {productoSeleccionado.id_producto}</div>
-                  {(() => {
-                    const foto = obtenerFotoProducto(productoSeleccionado.id_producto);
-                    if (foto) {
-                      return <img src={foto} alt="foto producto" className="w-24 h-24 object-cover rounded border mb-2" />;
-                    } else {
-                      return (
-                        <div className="flex flex-col items-center mb-2">
-                          <span className="text-xs text-gray-400 mb-1">No hay foto asociada.</span>
-                          <button
-                            className="bg-primary text-white px-3 py-1 rounded text-xs font-semibold hover:bg-primary-dark"
-                            onClick={() => {
-                              setProductoParaFoto(productoSeleccionado.id_producto);
-                              if (fileInputRef.current) fileInputRef.current.value = '';
-                              fileInputRef.current?.click();
-                            }}
-                          >
-                            Tomar o subir foto
-                          </button>
-                        </div>
-                      );
-                    }
-                  })()}
+              {showProductoModal && productoSeleccionado && (
+                <div className="fixed inset-0 bg-black bg-opacity-70 z-60 flex items-center justify-center">
+                  <div className="bg-white dark:bg-gray-900 rounded p-4 w-full max-w-md">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-bold text-lg text-primary">{productoSeleccionado.productos_descripcion}</h3>
+                        <div className="text-xs text-gray-500">Código: {productoSeleccionado.id_producto}</div>
+                      </div>
+                      <button className="text-gray-500" onClick={() => setShowProductoModal(false)}>✕</button>
+                    </div>
+                          <div className="mt-3">
+                            {(() => {
+                              const foto = obtenerFotoProducto(productoSeleccionado.id_producto);
+                              if (foto) {
+                                return <img src={foto} alt="foto producto" className="w-40 h-40 object-contain rounded border mx-auto" />;
+                              }
+                              return (
+                                <div className="flex flex-col items-center">
+                                  <div className="text-sm text-gray-500 mb-2">No hay foto asociada al producto.</div>
+                                  <div className="w-full flex flex-col gap-2">
+                                    <button className="bg-primary text-white rounded py-2" onClick={() => setProductoModalCapturando(true)}>Tomar foto</button>
+                                    <button className="bg-gray-200 rounded py-2" onClick={() => { setProductoParaFoto(productoSeleccionado.id_producto); if (fileInputRef.current) { fileInputRef.current.value = ''; fileInputRef.current.click(); } }}>Subir foto</button>
+                                    {/** Si el usuario inició la captura, renderizamos PhotoCapture con autoStart **/}
+                                      {productoModalCapturando && (
+                                        <div>
+                                          <PhotoCapture autoStart onCapture={async (dataUrl) => {
+                                            if (!productoSeleccionado) return;
+                                            await guardarFotoProductoDataUrl(productoSeleccionado.id_producto, dataUrl);
+                                            agregarAGaleria({ tipo: 'product', productoId: productoSeleccionado.id_producto, dataUrl });
+                                            // Forzar re-render y cerrar la captura
+                                            setProductoSeleccionado({ ...productoSeleccionado });
+                                            setProductoModalCapturando(false);
+                                          }} />
+                                          <button className="mt-2 text-sm text-gray-500" onClick={() => setProductoModalCapturando(false)}>Cancelar captura</button>
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                    <div className="mt-4 flex gap-2">
+                      <button className="flex-1 bg-primary text-white rounded py-2" onClick={() => setShowProductoModal(false)}>Cerrar</button>
+                      <button className="flex-1 bg-gray-200 rounded py-2" onClick={() => {
+                        // Abrir selector de archivo como alternativa
+                        setProductoParaFoto(productoSeleccionado.id_producto);
+                        if (fileInputRef.current) { fileInputRef.current.value = ''; fileInputRef.current.click(); }
+                      }}>Subir foto</button>
+                    </div>
+                  </div>
                 </div>
               )}
             </section>
@@ -821,11 +891,7 @@ const HomePage: React.FC = () => {
         {tab === 'galeria' && (
           <section>
             <h2 className="font-bold text-lg mb-2">Galería de fotos</h2>
-            <div className="grid grid-cols-3 gap-2">
-              {fotosEjemplo.map((url, i) => (
-                <img key={i} src={url} alt={`Foto ${i+1}`} className="rounded shadow object-cover w-full h-24" />
-              ))}
-            </div>
+            <GaleriaView />
           </section>
         )}
       </main>
@@ -835,3 +901,59 @@ const HomePage: React.FC = () => {
 };
 
 export default HomePage;
+
+// Componente interno para listar y editar la galería
+function GaleriaView() {
+  const [items, setItems] = useState<GaleriaItem[]>(() => obtenerGaleria());
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState<string>("");
+
+  const refresh = () => setItems(obtenerGaleria());
+
+  const handleDelete = (id: string) => {
+    const filtered = items.filter(i => i.id !== id);
+    localStorage.setItem('galeria', JSON.stringify(filtered));
+    refresh();
+  };
+
+  const startEdit = (item: GaleriaItem) => {
+    setEditingNameId(item.id);
+    setEditingNameValue(item.nombre || '');
+  };
+
+  const saveEdit = () => {
+    const all = obtenerGaleria();
+    const idx = all.findIndex(i => i.id === editingNameId);
+    if (idx >= 0) {
+      all[idx].nombre = editingNameValue;
+      localStorage.setItem('galeria', JSON.stringify(all));
+      setEditingNameId(null);
+      setEditingNameValue('');
+      refresh();
+    }
+  };
+
+  if (items.length === 0) return <div className="text-gray-400">No hay fotos en la galería.</div>;
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(item => (
+        <div key={item.id} className="bg-gray-100 rounded p-2 flex flex-col items-center">
+          <img src={item.dataUrl} alt={item.nombre || item.tipo} className="w-full h-24 object-cover rounded mb-2" />
+          <div className="text-xs text-gray-600 w-full truncate">{item.productoId ? `Producto ${item.productoId}` : item.tipo}</div>
+          {editingNameId === item.id ? (
+            <div className="w-full flex gap-1 mt-1">
+              <input className="flex-1 text-sm p-1" value={editingNameValue} onChange={e => setEditingNameValue(e.target.value)} />
+              <button className="px-2 bg-green-600 text-white rounded text-sm" onClick={saveEdit}>OK</button>
+            </div>
+          ) : (
+            <div className="w-full flex gap-1 mt-1">
+              <button className="flex-1 text-xs bg-primary text-white rounded py-1" onClick={() => startEdit(item)}>Renombrar</button>
+              <button className="flex-1 text-xs bg-red-200 text-red-700 rounded py-1" onClick={() => handleDelete(item.id)}>Eliminar</button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
