@@ -224,6 +224,8 @@ const HomePage: React.FC = () => {
   const [showCarrito, setShowCarrito] = useState(false);
   const [favoritos, setFavoritos] = useState<string[]>([]); // ids de producto
   const [carrito, setCarrito] = useState<string[]>([]); // ids de producto
+  // Estado para paginación de productos
+  const [verMasProductos, setVerMasProductos] = useState(10);
   // Datos de ejemplo para desarrollo
   // Simulamos 3 productos y 2 sucursales con precios distintos
 
@@ -462,7 +464,9 @@ const HomePage: React.FC = () => {
                     >
                       <div className="font-semibold text-sm text-primary">{sug.productos_descripcion}</div>
                       <div className="text-xs text-gray-500">{sug.productos_marca}</div>
-                      <div className="text-xs text-gray-400">${sug.precio_min?.toFixed(2)} - ${sug.precio_max?.toFixed(2)}</div>
+                      <div className="text-xs text-gray-400">
+                        ${Number(sug.precio_min || 0).toFixed(2)} - ${Number(sug.precio_max || 0).toFixed(2)}
+                      </div>
                     </li>
                   ))}
                   {loadingBusqueda && <li className="px-3 py-2 text-xs text-gray-400">Buscando...</li>}
@@ -567,44 +571,56 @@ const HomePage: React.FC = () => {
               <div className="grid grid-cols-2 gap-2 min-h-[220px]">
                 {loadingBusqueda ? (
                   <LoadingSpinner />
-                ) : productos.length === 0 ? (
-                  <div className="text-gray-400 text-center py-4 col-span-2">Aún no se agregaron productos consultados.</div>
-                ) : productos.map((p) => {
-                  const foto = obtenerFotoProducto(p.id_producto);
-                  return (
-                    <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
-                      <ProductCard
-                        producto={p}
-                        onClick={() => setProductoSeleccionado(p)}
-                        className={productoSeleccionado?.id_producto === p.id_producto ? "ring-2 ring-primary" : ""}
-                        fotoUrl={foto || undefined}
-                      />
-                      <div className="flex justify-between items-center mt-2 gap-2">
-                        <button
-                          className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
-                          title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
-                          }}
-                        >
-                          {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                        </button>
-                        <button
-                          className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
-                          title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
-                          }}
-                        >
-                          {carrito.includes(p.id_producto) ? 'En carrito' : 'Agregar'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+    ) : productos.length === 0 ? (
+      <div className="text-gray-400 text-center py-4 col-span-2">Aún no se agregaron productos consultados.</div>
+    ) : (
+      <>
+        {productos.slice(0, verMasProductos).map((p) => {
+          const foto = obtenerFotoProducto(p.id_producto);
+          return (
+            <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+              <ProductCard
+                producto={p}
+                onClick={() => setProductoSeleccionado(p)}
+                className={productoSeleccionado?.id_producto === p.id_producto ? "ring-2 ring-primary" : ""}
+                fotoUrl={foto || undefined}
+              />
+              <div className="flex justify-between items-center mt-2 gap-2">
+                <button
+                  className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`}
+                  title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]);
+                  }}
+                >
+                  {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                </button>
+                <button
+                  className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                  title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]);
+                  }}
+                >
+                  {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
+                </button>
               </div>
+            </div>
+          );
+        })}
+        {productos.length > verMasProductos && (
+          <button
+            className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+            onClick={() => setVerMasProductos(verMasProductos + 10)}
+          >
+            Ver más productos
+          </button>
+        )}
+      </>
+    )}
+  </div>
               {/* Detalle de producto seleccionado */}
               {productoSeleccionado && (
                 <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded shadow flex flex-col items-center">
