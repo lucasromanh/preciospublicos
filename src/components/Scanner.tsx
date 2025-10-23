@@ -4,15 +4,22 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 interface ScannerProps {
   onDetected: (result: string) => void;
   onError?: (error: Error) => void;
+  fullscreen?: boolean;
 }
 
-const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
+const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReader = useRef<BrowserMultiFormatReader>();
 
+  // Solo inicializar el codeReader una vez
   useEffect(() => {
-    codeReader.current = new BrowserMultiFormatReader();
-  // No usamos controls.stream, obtendremos el stream desde el videoRef
+    if (!codeReader.current) codeReader.current = new BrowserMultiFormatReader();
+  }, []);
+
+
+
+  useEffect(() => {
+    let isMounted = true;
     const startScanner = async () => {
       try {
         const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
@@ -20,14 +27,13 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
         // Buscar cámara trasera (environment)
         let backCamera = videoInputDevices.find(d => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("environment"));
         const deviceId = backCamera ? backCamera.deviceId : videoInputDevices[videoInputDevices.length - 1].deviceId;
-        // Guardar el stream para poder pararlo manualmente
         await codeReader.current!.decodeFromVideoDevice(
           deviceId,
           videoRef.current!,
           (result, err) => {
-            if (result) {
+            if (result && isMounted) {
               onDetected(result.getText());
-            } else if (err && onError) {
+            } else if (err && onError && isMounted) {
               onError(err);
             }
           }
@@ -38,6 +44,7 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
     };
     startScanner();
     return () => {
+      isMounted = false;
       // Detener el stream de la cámara si existe
       const video = videoRef.current;
       if (video && video.srcObject) {
@@ -54,14 +61,16 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError }) => {
         }
       }
     };
+    // Solo volver a pedir cámara si cambia onDetected/onError
+    // eslint-disable-next-line
   }, [onDetected, onError]);
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className={fullscreen ? "w-full h-full flex flex-col items-center justify-center" : "w-full flex flex-col items-center"}>
       <video
         ref={videoRef}
-        className="rounded shadow w-full max-w-md aspect-video bg-black min-h-[260px] min-w-[220px] sm:min-h-[320px] sm:min-w-[260px]"
-        style={{ minHeight: 260, minWidth: 220 }}
+        className={fullscreen ? "w-full h-full object-contain bg-black" : "rounded shadow w-full max-w-md aspect-video bg-black min-h-[260px] min-w-[220px] sm:min-h-[320px] sm:min-w-[260px]"}
+        style={fullscreen ? { width: '100vw', height: '100vh', objectFit: 'contain', background: 'black' } : { minHeight: 260, minWidth: 220 }}
         autoPlay
         muted
         playsInline

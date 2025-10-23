@@ -50,11 +50,12 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     }
   };
 
+  // Siempre centrar el mapa en la ubicación real si está disponible
   useEffect(() => {
-    if (!userLocation && !center) {
-      pedirUbicacion();
-    } else if (userLocation) {
+    if (userLocation && (center?.lat !== userLocation.lat || center?.lng !== userLocation.lng)) {
       setCenter(userLocation);
+    } else if (!userLocation && !center) {
+      pedirUbicacion();
     }
     // eslint-disable-next-line
   }, [userLocation]);

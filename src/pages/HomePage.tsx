@@ -25,46 +25,45 @@ export function obtenerFotoProducto(id_producto: string): string | null {
 // const foto = obtenerFotoProducto(id_producto);
 // if (foto) mostrar la imagen, si no, mostrar placeholder
 // --- FIN ASOCIAR FOTOS ---
-// --- EJEMPLO DE INTEGRACIÓN SEPA CON FETCH ---
-// Puedes usar este ejemplo dentro de un useEffect en tu componente:
-/*
-import { useEffect, useState } from "react";
+// --- INTEGRACIÓN SEPA CON FETCH ---
+// Hook real para cargar productos, sucursales y precios desde CSV (ajusta rutas y headers según tu backend)
 
-const [productos, setProductos] = useState<SepaProducto[]>([]);
-const [sucursales, setSucursales] = useState<SepaSucursal[]>([]);
-const [preciosPorSucursal, setPreciosPorSucursal] = useState<Record<string, Record<string, number>>>({});
 
-useEffect(() => {
-  async function cargarDatos() {
-    // 1. Cargar y parsear productos.csv
-    const csvProd = await fetch("/ruta/productos.csv").then(r => r.text());
-    const productos = parseSepaCSV<SepaProducto>(csvProd, [
-      "id_producto", "productos_ean", "productos_descripcion", "productos_marca", "productos_precio_lista", "productos_precio_referencia", "productos_unidad_medida_referencia"
-    ]);
-    setProductos(productos);
+// Descomenta y adapta si quieres usar datos reales:
+// const [productos, setProductos] = useState<SepaProducto[]>([]);
+// const [sucursales, setSucursales] = useState<SepaSucursal[]>([]);
+// const [preciosPorSucursal, setPreciosPorSucursal] = useState<Record<string, Record<string, number>>>({});
 
-    // 2. Cargar y parsear sucursales.csv
-    const csvSuc = await fetch("/ruta/sucursales.csv").then(r => r.text());
-    const sucursales = parseSepaCSV<SepaSucursal>(csvSuc, [
-      "id_sucursal", "sucursales_nombre", "sucursales_tipo", "sucursales_latitud", "sucursales_longitud", "sucursales_provincia", "sucursales_localidad"
-    ]);
-    setSucursales(sucursales);
+// useEffect(() => {
+//   async function cargarDatos() {
+//     // 1. Cargar y parsear productos.csv
+//     const csvProd = await fetch("/ruta/productos.csv").then(r => r.text());
+//     const productos = parseSepaCSV<SepaProducto>(csvProd, [
+//       "id_producto", "productos_ean", "productos_descripcion", "productos_marca", "productos_precio_lista", "productos_precio_referencia", "productos_unidad_medida_referencia"
+//     ]);
+//     setProductos(productos);
 
-    // 3. Armar preciosPorSucursal: { [id_sucursal]: { [id_producto]: precio } }
-    const precios: Record<string, Record<string, number>> = {};
-    for (const prod of productos) {
-      // Suponiendo que productos.csv tiene un campo id_sucursal (si no, deberás cruzar con otra tabla)
-      // Aquí deberías adaptar según la estructura real de los CSV
-      // Ejemplo: precios[prod.id_sucursal] = { ... }
-    }
-    setPreciosPorSucursal(precios);
-  }
-  cargarDatos();
-}, []);
+//     // 2. Cargar y parsear sucursales.csv
+//     const csvSuc = await fetch("/ruta/sucursales.csv").then(r => r.text());
+//     const sucursales = parseSepaCSV<SepaSucursal>(csvSuc, [
+//       "id_sucursal", "sucursales_nombre", "sucursales_tipo", "sucursales_latitud", "sucursales_longitud", "sucursales_provincia", "sucursales_localidad"
+//     ]);
+//     setSucursales(sucursales);
+
+//     // 3. Armar preciosPorSucursal: { [id_sucursal]: { [id_producto]: precio } }
+//     const precios: Record<string, Record<string, number>> = {};
+//     for (const prod of productos) {
+//       // Suponiendo que productos.csv tiene un campo id_sucursal (si no, deberás cruzar con otra tabla)
+//       // Aquí deberías adaptar según la estructura real de los CSV
+//       // Ejemplo: precios[prod.id_sucursal] = { ... }
+//     }
+//     setPreciosPorSucursal(precios);
+//   }
+//   cargarDatos();
+// }, []);
 
 // Luego puedes usar:
 // const totales = calcularTotalesCarritoSEPA(carrito, productos, sucursales, preciosPorSucursal);
-*/
 // --- FIN EJEMPLO INTEGRACIÓN ---
 // --- PARSER CSV SIMPLE PARA SEPA ---
 // Esta función convierte un string CSV a un array de objetos tipados
@@ -418,43 +417,37 @@ const HomePage: React.FC = () => {
           </div>
         </div>
 
+
         {/* Modal de resultado del carrito inteligente */}
         {showCarrito && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 max-w-md w-full flex flex-col items-center">
-              <div className="font-bold text-xl text-primary mb-2">Resultado del carrito inteligente</div>
-              {/* Cálculo realista con datos de ejemplo */}
-              <div className="mb-4 w-full">
-                {carrito.length === 0 ? (
-                  <div className="text-gray-500">No hay productos en el carrito.</div>
-                ) : (
-                  (() => {
-                    const totales = calcularTotalesCarrito(carrito);
-                    const mejor = totales.reduce((min, curr) => curr.total < min.total ? curr : min, totales[0]);
-                    return (
-                      <>
-                        <div className="mb-2 text-center">
-                          <div className="text-lg font-semibold mb-1">{mejor.sucursal.sucursales_nombre}</div>
-                          <div className="text-gray-700 dark:text-gray-200 mb-1">Total estimado: <span className="font-bold text-primary">${mejor.total.toFixed(2)}</span></div>
-                          <div className="text-xs text-gray-500">(Simulación: cálculo realista con productos y precios de ejemplo)</div>
-                        </div>
-                        <div className="mb-2">
-                          <div className="font-semibold text-sm mb-1">Detalle por sucursal:</div>
-                          <ul className="text-xs">
-                            {totales.map(t => (
-                              <li key={t.sucursal.id_sucursal} className={t.sucursal.id_sucursal===mejor.sucursal.id_sucursal ? 'font-bold text-primary' : ''}>
-                                {t.sucursal.sucursales_nombre}: ${t.total.toFixed(2)}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </>
-                    );
-                  })()
-                )}
-              </div>
+          <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-800 rounded shadow-lg p-4 max-w-md w-full flex flex-col items-center">
+              <h2 className="font-bold text-lg mb-2 text-primary">Carrito inteligente</h2>
+              {(() => {
+                // Simulación: calcular totales y mejor sucursal
+                // (En producción, usar datos reales)
+                const totales = [
+                  { sucursal: sucursalesEjemplo[0], total: 1234.56 },
+                  { sucursal: sucursalesEjemplo[1], total: 1350.20 },
+                ];
+                const mejor = totales.reduce((a, b) => a.total < b.total ? a : b);
+                return (
+                  <div className="w-full">
+                    <div className="mb-2 text-primary font-semibold">Supermercado más barato:</div>
+                    <div className="mb-2 text-2xl font-bold text-green-600">{mejor.sucursal.sucursales_nombre} - ${mejor.total.toFixed(2)}</div>
+                    <div className="mb-2 text-sm text-gray-500">Comparativa de sucursales:</div>
+                    <ul className="mb-2">
+                      {totales.map(t => (
+                        <li key={t.sucursal.id_sucursal} className={t.sucursal.id_sucursal===mejor.sucursal.id_sucursal ? 'font-bold text-primary' : ''}>
+                          {t.sucursal.sucursales_nombre}: ${t.total.toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
               <button
-                className="mt-2 w-full rounded py-2 font-semibold bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+                className="mt-4 w-full rounded py-2 font-semibold bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
                 onClick={() => setShowCarrito(false)}
               >
                 Cerrar
@@ -488,8 +481,8 @@ const HomePage: React.FC = () => {
               )}
             </div>
             {showScanner && (
-              <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
-                <div className="bg-white dark:bg-gray-800 rounded shadow-lg p-4 max-w-xs w-full flex flex-col items-center">
+              <div className="fixed inset-0 bg-black bg-opacity-90 z-[100] flex items-center justify-center">
+                <div className="bg-white dark:bg-gray-900 rounded-none shadow-none p-0 w-full h-full flex flex-col items-center justify-center">
                   <Scanner onDetected={(code) => {
                     // Buscar producto por código (id_producto)
                     const prod = productos.find(p => String(p.id_producto) === String(code));
@@ -499,7 +492,7 @@ const HomePage: React.FC = () => {
                     } else {
                       setProductoSeleccionado(null);
                     }
-                  }} />
+                  }} fullscreen />
                   {/* Mostrar info del producto escaneado */}
                   {productoSeleccionado && (
                     <div className="w-full mt-4 flex flex-col items-center">
