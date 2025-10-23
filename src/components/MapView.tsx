@@ -1,14 +1,25 @@
+// src/components/MapView.tsx
 import React, { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Circle,
+  useMap,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { Sucursal } from "../types/Sucursal";
 import L from "leaflet";
 
-// Icono azul para el usuario
+/* =======================================================
+   🎯 ICONOS PERSONALIZADOS (SVG embebidos corregidos)
+   ======================================================= */
 const svgUser = encodeURIComponent(`
 <svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41' fill='none'>
-<path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%23377dff'/>
+  <path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%23377dff'/>
 </svg>`);
+
 const userIcon = new L.Icon({
   iconUrl: `data:image/svg+xml,${svgUser}`,
   iconSize: [36, 58],
@@ -16,11 +27,11 @@ const userIcon = new L.Icon({
   popupAnchor: [0, -58],
 });
 
-// Icono naranja para sucursales
 const svgShop = encodeURIComponent(`
 <svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41' fill='none'>
-<path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%23ff8800'/>
+  <path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%23ff8800'/>
 </svg>`);
+
 const shopIcon = new L.Icon({
   iconUrl: `data:image/svg+xml,${svgShop}`,
   iconSize: [36, 58],
@@ -28,11 +39,11 @@ const shopIcon = new L.Icon({
   popupAnchor: [0, -58],
 });
 
-// Icono verde para sucursales cercanas
 const svgNear = encodeURIComponent(`
 <svg xmlns='http://www.w3.org/2000/svg' width='25' height='41' viewBox='0 0 25 41' fill='none'>
-<path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%2320c997'/>
+  <path d='M12.5 0C5.6 0 0 5.6 0 12.5C0 23.1 12.5 41 12.5 41C12.5 41 25 23.1 25 12.5C25 5.6 19.4 0 12.5 0ZM12.5 17.5C9.5 17.5 7.1 15.1 7.1 12.1C7.1 9.1 9.5 6.7 12.5 6.7C15.5 6.7 17.9 9.1 17.9 12.1C17.9 15.1 15.5 17.5 12.5 17.5Z' fill='%2320c997'/>
 </svg>`);
+
 const nearIcon = new L.Icon({
   iconUrl: `data:image/svg+xml,${svgNear}`,
   iconSize: [36, 58],
@@ -40,34 +51,44 @@ const nearIcon = new L.Icon({
   popupAnchor: [0, -58],
 });
 
+/* =======================================================
+   🗺️ INTERFAZ
+   ======================================================= */
 interface MapViewProps {
   sucursales: Sucursal[];
   userLocation?: { lat: number; lng: number };
 }
 
+/* =======================================================
+   🧭 COMPONENTE PRINCIPAL
+   ======================================================= */
 const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
-  const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(userLocation || null);
+  const [center, setCenter] = React.useState<{ lat: number; lng: number } | null>(
+    userLocation || null
+  );
   const [geoError, setGeoError] = React.useState<string | null>(null);
   const [loadingGeo, setLoadingGeo] = React.useState(false);
   const [radiusKm, setRadiusKm] = React.useState<number>(3);
 
+  /* ===============================
+     📍 FUNCIÓN DE GEOLOCALIZACIÓN
+     =============================== */
   const pedirUbicacion = async () => {
     setLoadingGeo(true);
     setGeoError(null);
-
     if (!navigator.geolocation) {
       setGeoError("Tu dispositivo no soporta geolocalización");
       setLoadingGeo(false);
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
-      pos => {
+      (pos) => {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCenter(coords);
         setLoadingGeo(false);
       },
-      err => {
+      (err) => {
+        console.warn("Error GPS:", err);
         setGeoError("No se pudo obtener tu ubicación (verifica permisos de GPS)");
         setLoadingGeo(false);
       },
@@ -83,7 +104,9 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     }
   }, [userLocation]);
 
-  // Helper: distancia en km entre dos coordenadas
+  /* ===============================
+     📏 FUNCIÓN DISTANCIA ENTRE 2 PUNTOS
+     =============================== */
   const distanciaKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
     const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -96,10 +119,13 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     return R * c;
   };
 
+  /* ===============================
+     🧮 SUCURSALES CON DISTANCIA
+     =============================== */
   const sucursalesConDistancia = React.useMemo(() => {
     if (!center) return [] as Array<any>;
     return sucursales
-      .map(s => ({
+      .map((s) => ({
         suc: s,
         distancia: distanciaKm(center.lat, center.lng, s.sucursales_latitud, s.sucursales_longitud),
       }))
@@ -108,7 +134,9 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
 
   const top5 = sucursalesConDistancia.slice(0, 5);
 
-  // Centrar el mapa con animación
+  /* ===============================
+     🌀 SYNC CENTER (Centrar animado)
+     =============================== */
   const SyncCenter: React.FC<{ center: { lat: number; lng: number } | null }> = ({ center }) => {
     const map = useMap();
     useEffect(() => {
@@ -117,7 +145,9 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     return null;
   };
 
-  // Control flotante (📍 botón dentro del mapa)
+  /* ===============================
+     🧩 CONTROL FLOANTE (📍 botón mapa)
+     =============================== */
   const MapControls: React.FC<{ onLocate: () => void }> = ({ onLocate }) => {
     const map = useMap();
     useEffect(() => {
@@ -125,11 +155,13 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         onAdd: function () {
           const container = L.DomUtil.create("div", "leaflet-bar custom-location-control");
           container.innerHTML = "📍";
-          container.style.background = "white";
-          container.style.padding = "6px";
-          container.style.cursor = "pointer";
-          container.style.borderRadius = "4px";
-          container.style.boxShadow = "0 1px 4px rgba(0,0,0,0.3)";
+          Object.assign(container.style, {
+            background: "white",
+            padding: "6px",
+            cursor: "pointer",
+            borderRadius: "4px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+          });
           L.DomEvent.disableClickPropagation(container);
           L.DomEvent.on(container, "click", onLocate);
           return container;
@@ -144,6 +176,9 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
     return null;
   };
 
+  /* ===============================
+     🗺️ RENDER DEL MAPA
+     =============================== */
   return (
     <div className="w-full h-64 rounded overflow-hidden relative" style={{ zIndex: 0 }}>
       {geoError && (
@@ -156,6 +191,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
           Buscando ubicación...
         </div>
       )}
+
       <MapContainer
         center={center || { lat: -24.7859, lng: -65.4117 }}
         zoom={16}
@@ -167,6 +203,8 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         />
         <SyncCenter center={center} />
         <MapControls onLocate={pedirUbicacion} />
+
+        {/* 📍 MARCADOR USUARIO */}
         {center && (
           <>
             <Marker position={center} icon={userIcon}>
@@ -179,6 +217,8 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
             />
           </>
         )}
+
+        {/* 🏪 MARCADORES DE SUCURSALES */}
         {sucursalesConDistancia.map(({ suc, distancia }) => (
           <Marker
             key={suc.id_sucursal}
@@ -198,15 +238,21 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         ))}
       </MapContainer>
 
+      {/* 🎛️ RADIO */}
       <div className="absolute top-2 right-2 bg-white rounded shadow p-2 text-xs">
         <label>Radio (km): </label>
-        <select value={radiusKm} onChange={e => setRadiusKm(Number(e.target.value))} className="text-xs">
+        <select
+          value={radiusKm}
+          onChange={(e) => setRadiusKm(Number(e.target.value))}
+          className="text-xs"
+        >
           <option value={1}>1</option>
           <option value={3}>3</option>
           <option value={5}>5</option>
         </select>
       </div>
 
+      {/* 📍 BOTÓN EXTERIOR */}
       <div className="w-full flex justify-center mt-2">
         <button
           className="bg-primary text-white rounded-full shadow-lg px-4 py-2 text-sm font-semibold"
@@ -216,6 +262,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         </button>
       </div>
 
+      {/* 🏪 LISTA SUCURSALES */}
       <div className="mt-3">
         <h3 className="font-semibold text-sm mb-2">Sucursales más cercanas</h3>
         {top5.length === 0 ? (
@@ -224,7 +271,7 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
           </div>
         ) : (
           <ul className="space-y-2">
-            {top5.map(item => (
+            {top5.map((item) => (
               <li
                 key={item.suc.id_sucursal}
                 className="flex items-center justify-between bg-white p-2 rounded shadow-sm"
