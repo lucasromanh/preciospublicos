@@ -158,6 +158,7 @@ import { getComparaciones } from "../services/apiService";
 import ProductCard from "../components/ProductCard";
 import Scanner from "../components/Scanner";
 import LoadingSpinner from "../components/LoadingSpinner";
+import InstallAppBanner from "../components/InstallAppBanner";
 import MapView from "../components/MapView";
 import PriceComparisonTable, { PriceRow } from "../components/PriceComparisonTable";
 import PhotoCapture from "../components/PhotoCapture";
@@ -319,6 +320,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900">
       <Header onScanClick={() => setShowScanner(true)} />
+      <InstallAppBanner />
       <main className="flex-1 p-4 flex flex-col gap-4">
         {/* Tabs */}
         <div className="flex gap-2 mb-4">
