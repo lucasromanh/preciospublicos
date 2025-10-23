@@ -37,7 +37,9 @@ const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({ rows, order
             <tr key={i} className="text-center border-b last:border-0">
               <td className="p-2 font-semibold">{row.supermercado}</td>
               <td className="p-2">{row.localidad}</td>
-              <td className={`p-2 font-bold ${row.precio === min ? "text-green-600" : row.precio === max ? "text-red-600" : ""}`}>${row.precio.toFixed(2)}</td>
+              <td className={`p-2 font-bold ${row.precio === min ? "text-green-600" : row.precio === max ? "text-red-600" : ""}`}>
+                ${Number(row.precio ?? 0).toFixed(2)}
+              </td>
               <td className="p-2">{row.distancia.toFixed(1)} km</td>
               <td className="p-2 text-xs">{row.ultimaActualizacion}</td>
             </tr>
@@ -45,7 +47,7 @@ const PriceComparisonTable: React.FC<PriceComparisonTableProps> = ({ rows, order
         </tbody>
       </table>
       <div className="mt-2 text-xs text-gray-500">
-        <span>Promedio: ${ (precios.reduce((a, b) => a + b, 0) / precios.length).toFixed(2) }</span>
+  <span>Promedio: ${ (precios.length ? (precios.reduce((a, b) => a + b, 0) / precios.length) : 0).toFixed(2) }</span>
       </div>
     </div>
   );

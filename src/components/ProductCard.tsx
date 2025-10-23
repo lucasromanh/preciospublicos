@@ -31,8 +31,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ producto, onClick, className 
       )}
       <div className="flex flex-col justify-between flex-1 min-w-0 h-full">
         <div className="flex items-center gap-2">
-          <span className="text-primary font-bold text-lg truncate max-w-[6rem]" title={producto.productos_precio_lista.toFixed(2)}>
-            ${producto.productos_precio_lista.toFixed(2).length > 10 ? producto.productos_precio_lista.toFixed(2).slice(0, 10) + '…' : producto.productos_precio_lista.toFixed(2)}
+          <span className="text-primary font-bold text-lg truncate max-w-[6rem]" title={String(Number(producto.productos_precio_lista ?? 0).toFixed(2))}>
+            {(() => {
+              const precio = Number(producto.productos_precio_lista ?? 0);
+              const precioStr = precio.toFixed(2);
+              return `$${precioStr.length > 10 ? precioStr.slice(0, 10) + '…' : precioStr}`;
+            })()}
           </span>
           {producto.productos_leyenda_promo1 && (
             <span className="text-xs bg-yellow-100 text-yellow-800 rounded px-2 py-1 truncate max-w-[5rem]" title={producto.productos_leyenda_promo1}>{producto.productos_leyenda_promo1}</span>
