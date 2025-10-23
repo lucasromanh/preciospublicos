@@ -213,6 +213,20 @@ const fotosEjemplo = [
 ];
 
 const HomePage: React.FC = () => {
+  // Estado para ubicación del usuario
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Forzar obtención de ubicación real al cargar la HomePage
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {},
+        { enableHighAccuracy: true, timeout: 7000 }
+      );
+    }
+  }, []);
+
   const [search, setSearch] = useState("");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [sugerencias, setSugerencias] = useState<any[]>([]);
@@ -656,21 +670,21 @@ const HomePage: React.FC = () => {
               <div className="mb-2 text-xs text-gray-400 dark:text-gray-300">
                 Selecciona un producto para ver los precios en sucursales cercanas.
               </div>
-              <div className="mb-4">
-                <MapView sucursales={sucursalesEjemplo} />
-              </div>
-              <div className="mb-4">
-                {productoSeleccionado ? (
-                  <>
-                    <div className="mb-2 font-semibold text-primary">
-                      Precios de <span className="underline">{productoSeleccionado.productos_descripcion}</span> en sucursales:
-                    </div>
-                    <PriceComparisonTable rows={comparacionEjemplo} />
-                  </>
-                ) : (
-                  <div className="text-gray-400">Selecciona un producto para comparar precios.</div>
-                )}
-              </div>
+  <div className="mb-4">
+    <MapView sucursales={sucursalesEjemplo} userLocation={userLocation ?? undefined} />
+  </div>
+  <div className="mb-4">
+    {productoSeleccionado ? (
+      <>
+        <div className="mb-2 font-semibold text-primary">
+          Precios de <span className="underline">{productoSeleccionado.productos_descripcion}</span> en sucursales:
+        </div>
+        <PriceComparisonTable rows={comparacionEjemplo} />
+      </>
+    ) : (
+      <div className="text-gray-400">Selecciona un producto para comparar precios.</div>
+    )}
+  </div>
               <div className="mb-4 flex flex-col gap-2">
                 <button
                   className="bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary w-fit"
