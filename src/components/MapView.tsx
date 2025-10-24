@@ -52,6 +52,10 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   const [loadingGeo, setLoadingGeo] = React.useState(false);
   const [radiusKm, setRadiusKm] = React.useState<number>(3);
   const [osmStores, setOsmStores] = React.useState<any[]>([]);
+  const [osmLoading, setOsmLoading] = React.useState(false);
+  const [osmError, setOsmError] = React.useState<string | null>(null);
+  const osmCache = React.useRef<Map<string, { ts: number; data: any[] }>>(new Map());
+  const fetchTimer = React.useRef<number | null>(null);
 
   /* =======================================================
      📍 FUNCIÓN DE GEOLOCALIZACIÓN
@@ -132,43 +136,83 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
   useEffect(() => {
     if (!center) return;
 
-    const fetchOSM = async () => {
+    // Debounce + cache key
+    const key = `${Math.round(center.lat * 10000)}_${Math.round(center.lng * 10000)}_${radiusKm}`;
+
+    // If cached and recent (< 10min) use it
+    const cached = osmCache.current.get(key);
+    if (cached && Date.now() - cached.ts < 1000 * 60 * 10) {
+      setOsmStores(cached.data);
+      return;
+    }
+
+    if (fetchTimer.current) window.clearTimeout(fetchTimer.current);
+    fetchTimer.current = window.setTimeout(async () => {
+      setOsmLoading(true);
+      setOsmError(null);
       try {
+        // Query includes nodes, ways and relations and asks for center for ways/relations
         const query = `
           [out:json][timeout:25];
           (
             node["shop"="supermarket"](around:${radiusKm * 1000},${center.lat},${center.lng});
             node["shop"="convenience"](around:${radiusKm * 1000},${center.lat},${center.lng});
             node["shop"="mall"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            way["shop"="supermarket"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            way["shop"="convenience"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            way["shop"="mall"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            relation["shop"="supermarket"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            relation["shop"="convenience"](around:${radiusKm * 1000},${center.lat},${center.lng});
+            relation["shop"="mall"](around:${radiusKm * 1000},${center.lat},${center.lng});
           );
-          out body;
+          out center;
         `;
+
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
           body: query,
         });
         const data = await res.json();
-        if (data?.elements) {
-          setOsmStores(data.elements);
-          // guardar automáticamente en tu backend (opcional)
-          data.elements.forEach((store: any) => {
-            const nombre = store.tags?.name || "Comercio sin nombre";
-            const tipo = store.tags?.shop || "supermarket";
-            const lat = store.lat;
-            const lng = store.lon;
-            fetch("https://masbarato.saltacoders.com/api.php?action=saveOSMStore", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
+        const elements = data?.elements || [];
+
+        // Normalize: ensure lat/lon exists (use center for ways/relations)
+        const normalized = elements
+          .map((el: any) => {
+            if (el.type === 'node') return { ...el, _lat: el.lat, _lon: el.lon };
+            if (el.center && typeof el.center.lat === 'number' && typeof el.center.lon === 'number') return { ...el, _lat: el.center.lat, _lon: el.center.lon };
+            return null;
+          })
+          .filter((x: any) => x !== null);
+
+        setOsmStores(normalized);
+        osmCache.current.set(key, { ts: Date.now(), data: normalized });
+
+        // NOTE: dejar envío al backend desactivado por defecto para evitar spam
+        const SHOULD_SAVE_OSM = false;
+        if (SHOULD_SAVE_OSM) {
+          normalized.forEach((store: any) => {
+            const nombre = store.tags?.name || 'Comercio sin nombre';
+            const tipo = store.tags?.shop || 'supermarket';
+            const lat = store._lat;
+            const lng = store._lon;
+            fetch('https://masbarato.saltacoders.com/api.php?action=saveOSMStore', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ nombre, lat, lng, tipo }),
             }).catch(() => {});
           });
         }
-      } catch (err) {
-        console.error("Error cargando OSM:", err);
+      } catch (err: any) {
+        console.error('Error cargando OSM:', err);
+        setOsmError('No se pudo cargar OpenStreetMap');
+      } finally {
+        setOsmLoading(false);
       }
-    };
+    }, 800);
 
-    fetchOSM();
+    return () => {
+      if (fetchTimer.current) window.clearTimeout(fetchTimer.current);
+    };
   }, [center, radiusKm]);
 
   /* =======================================================
@@ -257,6 +301,14 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         <SyncCenter center={center} />
         <MapControls onLocate={pedirUbicacion} />
 
+        {/* OSM carga: indicador */}
+        {osmLoading && (
+          <div className="absolute z-50 left-2 top-2 bg-white/90 text-sm text-gray-700 px-2 py-1 rounded shadow">Cargando OSM...</div>
+        )}
+        {osmError && (
+          <div className="absolute z-50 left-2 top-2 bg-red-100 text-xs text-red-700 px-2 py-1 rounded shadow">{osmError}</div>
+        )}
+
         {/* 📍 MARCADOR USUARIO */}
         {center && (
           <>
@@ -293,12 +345,12 @@ const MapView: React.FC<MapViewProps> = ({ sucursales, userLocation }) => {
         {/* 🗺️ SUPERMERCADOS DE OPENSTREETMAP */}
         {osmStores.map((store, idx) => (
           <Marker
-            key={`osm-${idx}`}
-            position={{ lat: store.lat, lng: store.lon }}
+            key={`osm-${store.type || idx}-${store.id || idx}`}
+            position={{ lat: store._lat, lng: store._lon }}
             icon={osmIcon}
           >
             <Popup>
-              🏪 <strong>{store.tags?.name || "Supermercado sin nombre"}</strong>
+              🏪 <strong>{store.tags?.name || 'Supermercado sin nombre'}</strong>
               <br />
               {store.tags?.brand && <span>Marca: {store.tags.brand}</span>}
               <br />

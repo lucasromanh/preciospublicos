@@ -160,8 +160,155 @@ const HomePage: React.FC = () => {
 
   const productosBaratos = productos.slice().sort((a, b) => a.productos_precio_lista - b.productos_precio_lista);
 
+  // Renderizado modular de la sección de productos según la pestaña activa
+  const renderProductsSection = () => {
+    if (tab === 'galeria') return null;
+
+    if (tab === 'inicio') {
+      return (
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-bold text-lg">Productos más consultados</h2>
+            <button
+              className="text-xs px-3 py-1 rounded bg-primary text-white hover:bg-primary-dark"
+              onClick={async () => {
+                setLoadingBusqueda(true);
+                try {
+                  const res = await getComparaciones();
+                  setProductos(
+                    res.map((sug: any) => ({
+                      id_producto: sug.id_producto,
+                      productos_ean: 0,
+                      productos_descripcion: sug.productos_descripcion,
+                      productos_marca: sug.productos_marca,
+                      productos_precio_lista: sug.precio_min,
+                      productos_precio_referencia: sug.precio_promedio,
+                      productos_cantidad_presentacion: '',
+                      productos_unidad_medida_presentacion: '',
+                      productos_unidad_medida_referencia: '',
+                      productos_categoria: '',
+                      productos_leyenda_promo1: '',
+                      productos_leyenda_promo2: '',
+                    }))
+                  );
+                } catch {}
+                setLoadingBusqueda(false);
+              }}
+            >
+              Ver productos del backend
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 min-h-[220px]">
+            {loadingBusqueda ? (
+              <LoadingSpinner />
+            ) : productos.length === 0 ? (
+              <div className="text-gray-400 text-center py-4 col-span-2">Aún no se agregaron productos consultados.</div>
+            ) : (
+              <>
+                {productos.slice(0, verMasProductos).map(p => {
+                  const foto = obtenerFotoProducto(p.id_producto);
+                  return (
+                    <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+                      <div
+                        onClick={() => { setProductoSeleccionado(p); setShowProductoModal(true); }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <ProductCard producto={p} className={productoSeleccionado?.id_producto === p.id_producto ? 'ring-2 ring-primary' : ''} fotoUrl={foto || undefined} />
+                      </div>
+                      <div className="flex justify-between items-center mt-2 gap-2">
+                        <button className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`} title={favoritos.includes(p.id_producto) ? 'Quitar de favoritos' : 'Agregar a favoritos'} onClick={e => { e.stopPropagation(); setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]); }}>
+                          {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                        </button>
+                        <button className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`} title={carrito.includes(p.id_producto) ? 'Quitar del carrito' : 'Agregar al carrito'} onClick={e => { e.stopPropagation(); setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]); }}>
+                          {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {productos.length > verMasProductos && (
+                  <button className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary" onClick={() => setVerMasProductos(verMasProductos + 10)}>Ver más productos</button>
+                )}
+              </>
+            )}
+          </div>
+
+          {showProductoModal && productoSeleccionado && (
+            <ProductModal producto={productoSeleccionado} onClose={() => setShowProductoModal(false)} onFotoGuardada={url => { guardarFotoProductoDataUrl(productoSeleccionado.id_producto, url); setProductos(prev => prev.map(p => p.id_producto === productoSeleccionado.id_producto ? { ...p, imagen_local: url } : p)); setProductoSeleccionado({ ...productoSeleccionado, imagen_local: url }); }} />
+          )}
+        </section>
+      );
+    }
+
+    if (tab === 'baratos') {
+      return (
+        <section>
+          <div className="flex items-center justify-between mb-2"><h2 className="font-bold text-lg">Productos más baratos</h2></div>
+          <div className="grid grid-cols-2 gap-2 min-h-[220px]">
+            {loadingBusqueda ? (
+              <LoadingSpinner />
+            ) : productosBaratos.length === 0 ? (
+              <div className="text-gray-400 text-center py-4 col-span-2">No hay productos para mostrar.</div>
+            ) : (
+              <>
+                {productosBaratos.slice(0, verMasProductos).map(p => {
+                  const foto = obtenerFotoProducto(p.id_producto);
+                  return (
+                    <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+                      <div onClick={() => { setProductoSeleccionado(p); setShowProductoModal(true); }} style={{ cursor: 'pointer' }}>
+                        <ProductCard producto={p} className={productoSeleccionado?.id_producto === p.id_producto ? 'ring-2 ring-primary' : ''} fotoUrl={foto || undefined} />
+                      </div>
+                      <div className="flex justify-between items-center mt-2 gap-2">
+                        <button className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`} onClick={e => { e.stopPropagation(); setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]); }}>{favoritos.includes(p.id_producto) ? '★' : '☆'}</button>
+                        <button className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`} onClick={e => { e.stopPropagation(); setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]); }}>{carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {productosBaratos.length > verMasProductos && (<button className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary" onClick={() => setVerMasProductos(verMasProductos + 10)}>Ver más productos</button>)}
+              </>
+            )}
+          </div>
+        </section>
+      );
+    }
+
+    // favoritos
+    return (
+      <section>
+        <div className="flex items-center justify-between mb-2"><h2 className="font-bold text-lg">Productos favoritos</h2></div>
+        <div className="grid grid-cols-2 gap-2 min-h-[220px]">
+          {loadingBusqueda ? (
+            <LoadingSpinner />
+          ) : productos.filter(p => favoritos.includes(p.id_producto)).length === 0 ? (
+            <div className="text-gray-400 text-center py-4 col-span-2">No tienes productos favoritos aún.</div>
+          ) : (
+            <>
+              {productos.filter(p => favoritos.includes(p.id_producto)).slice(0, verMasProductos).map(p => {
+                const foto = obtenerFotoProducto(p.id_producto);
+                return (
+                  <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+                    <div onClick={() => { setProductoSeleccionado(p); setShowProductoModal(true); }} style={{ cursor: 'pointer' }}>
+                      <ProductCard producto={p} className={productoSeleccionado?.id_producto === p.id_producto ? 'ring-2 ring-primary' : ''} fotoUrl={foto || undefined} />
+                    </div>
+                    <div className="flex justify-between items-center mt-2 gap-2">
+                      <button className={`text-lg ${favoritos.includes(p.id_producto) ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-500`} onClick={e => { e.stopPropagation(); setFavoritos(favoritos.includes(p.id_producto) ? favoritos.filter(id => id !== p.id_producto) : [...favoritos, p.id_producto]); }}>{favoritos.includes(p.id_producto) ? '★' : '☆'}</button>
+                      <button className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto) ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700'}`} onClick={e => { e.stopPropagation(); setCarrito(carrito.includes(p.id_producto) ? carrito.filter(id => id !== p.id_producto) : [...carrito, p.id_producto]); }}>{carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {productos.filter(p => favoritos.includes(p.id_producto)).length > verMasProductos && (<button className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary" onClick={() => setVerMasProductos(verMasProductos + 10)}>Ver más productos</button>)}
+            </>
+          )}
+        </div>
+      </section>
+    );
+  };
+
   return (
-    <><div className="min-h-screen flex flex-col bg-white dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900">
       <Header onScanClick={() => setShowScanner(true)} />
       <InstallAppBanner />
       <main className="flex-1 p-4 flex flex-col gap-4">
@@ -352,8 +499,6 @@ const HomePage: React.FC = () => {
                 </ul>
               )}
             </div>
-          </>
-        )}
         {/* SCANNER */}
         {showScanner && (
           <div className="fixed inset-0 bg-black bg-opacity-90 z-[1000] flex items-center justify-center">
@@ -466,322 +611,11 @@ const HomePage: React.FC = () => {
           </div>
         )}
 
-        {/* SECCIÓN DE PRODUCTOS */}
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-bold text-lg">Productos más consultados</h2>
-            <button
-              className="text-xs px-3 py-1 rounded bg-primary text-white hover:bg-primary-dark"
-              onClick={async () => {
-                setLoadingBusqueda(true);
-                try {
-                  const res = await getComparaciones();
-                  setProductos(
-                    res.map((sug: any) => ({
-                      id_producto: sug.id_producto,
-                      productos_ean: 0,
-                      productos_descripcion: sug.productos_descripcion,
-                      productos_marca: sug.productos_marca,
-                      productos_precio_lista: sug.precio_min,
-                      productos_precio_referencia: sug.precio_promedio,
-                      productos_cantidad_presentacion: '',
-                      productos_unidad_medida_presentacion: '',
-                      productos_unidad_medida_referencia: '',
-                      productos_categoria: '',
-                      productos_leyenda_promo1: '',
-                      productos_leyenda_promo2: '',
-                    }))
-                  );
-                } catch { }
-                setLoadingBusqueda(false);
-              } }
-            >
-              Ver productos del backend
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 min-h-[220px]">
-            {loadingBusqueda ? (
-              <LoadingSpinner />
-            ) : productos.length === 0 ? (
-              <div className="text-gray-400 text-center py-4 col-span-2">
-                Aún no se agregaron productos consultados.
-              </div>
-            ) : (
-              <>
-                {productos.slice(0, verMasProductos).map(p => {
-                  const foto = obtenerFotoProducto(p.id_producto);
-                  return (
-                    <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
-                      <div
-                        onClick={() => {
-                          setProductoSeleccionado(p);
-                          setShowProductoModal(true);
-                        } }
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <ProductCard
-                          producto={p}
-                          className={productoSeleccionado?.id_producto === p.id_producto
-                            ? 'ring-2 ring-primary'
-                            : ''}
-                          fotoUrl={foto || undefined} />
-                      </div>
-
-                      <div className="flex justify-between items-center mt-2 gap-2">
-                        <button
-                          className={`text-lg ${favoritos.includes(p.id_producto)
-                              ? 'text-yellow-400'
-                              : 'text-gray-300'} hover:text-yellow-500`}
-                          title={favoritos.includes(p.id_producto)
-                            ? 'Quitar de favoritos'
-                            : 'Agregar a favoritos'}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setFavoritos(
-                              favoritos.includes(p.id_producto)
-                                ? favoritos.filter(id => id !== p.id_producto)
-                                : [...favoritos, p.id_producto]
-                            );
-                          } }
-                        >
-                          {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                        </button>
-
-                        <button
-                          className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto)
-                              ? 'bg-primary text-white'
-                              : 'bg-gray-200 dark:bg-gray-700'}`}
-                          title={carrito.includes(p.id_producto)
-                            ? 'Quitar del carrito'
-                            : 'Agregar al carrito'}
-                          onClick={e => {
-                            e.stopPropagation();
-                            setCarrito(
-                              carrito.includes(p.id_producto)
-                                ? carrito.filter(id => id !== p.id_producto)
-                                : [...carrito, p.id_producto]
-                            );
-                          } }
-                        >
-                          {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {productos.length > verMasProductos && (
-                  <button
-                    className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
-                    onClick={() => setVerMasProductos(verMasProductos + 10)}
-                  >
-                    Ver más productos
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          {showProductoModal && productoSeleccionado && (
-            <ProductModal
-              producto={productoSeleccionado}
-              onClose={() => setShowProductoModal(false)}
-              onFotoGuardada={url => {
-                guardarFotoProductoDataUrl(productoSeleccionado.id_producto, url);
-                setProductos(prev => prev.map(p => p.id_producto === productoSeleccionado.id_producto
-                  ? { ...p, imagen_local: url }
-                  : p
-                )
-                );
-                setProductoSeleccionado({ ...productoSeleccionado, imagen_local: url });
-              } } />
-          )}
-        </section>
-
-        {/* TAB BARATOS */}
-        {tab === 'baratos' && (
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-bold text-lg">Productos más baratos</h2>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 min-h-[220px]">
-              {loadingBusqueda ? (
-                <LoadingSpinner />
-              ) : productosBaratos.length === 0 ? (
-                <div className="text-gray-400 text-center py-4 col-span-2">
-                  No hay productos para mostrar.
-                </div>
-              ) : (
-                <>
-                  {productosBaratos.slice(0, verMasProductos).map(p => {
-                    const foto = obtenerFotoProducto(p.id_producto);
-                    return (
-                      <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
-                        <div
-                          onClick={() => {
-                            setProductoSeleccionado(p);
-                            setShowProductoModal(true);
-                          } }
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <ProductCard
-                            producto={p}
-                            className={productoSeleccionado?.id_producto === p.id_producto
-                              ? 'ring-2 ring-primary'
-                              : ''}
-                            fotoUrl={foto || undefined} />
-                        </div>
-
-                        <div className="flex justify-between items-center mt-2 gap-2">
-                          <button
-                            className={`text-lg ${favoritos.includes(p.id_producto)
-                                ? 'text-yellow-400'
-                                : 'text-gray-300'} hover:text-yellow-500`}
-                            title={favoritos.includes(p.id_producto)
-                              ? 'Quitar de favoritos'
-                              : 'Agregar a favoritos'}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setFavoritos(
-                                favoritos.includes(p.id_producto)
-                                  ? favoritos.filter(id => id !== p.id_producto)
-                                  : [...favoritos, p.id_producto]
-                              );
-                            } }
-                          >
-                            {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                          </button>
-
-                          <button
-                            className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto)
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-200 dark:bg-gray-700'}`}
-                            title={carrito.includes(p.id_producto)
-                              ? 'Quitar del carrito'
-                              : 'Agregar al carrito'}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setCarrito(
-                                carrito.includes(p.id_producto)
-                                  ? carrito.filter(id => id !== p.id_producto)
-                                  : [...carrito, p.id_producto]
-                              );
-                            } }
-                          >
-                            {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {productosBaratos.length > verMasProductos && (
-                    <button
-                      className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
-                      onClick={() => setVerMasProductos(verMasProductos + 10)}
-                    >
-                      Ver más productos
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </section>
+          </>
         )}
 
-        {/* TAB FAVORITOS */}
-        {tab === 'favoritos' && (
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-bold text-lg">Productos favoritos</h2>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 min-h-[220px]">
-              {loadingBusqueda ? (
-                <LoadingSpinner />
-              ) : productos.filter(p => favoritos.includes(p.id_producto)).length === 0 ? (
-                <div className="text-gray-400 text-center py-4 col-span-2">
-                  No tienes productos favoritos aún.
-                </div>
-              ) : (
-                <>
-                  {productos.filter(p => favoritos.includes(p.id_producto)).slice(0, verMasProductos).map(p => {
-                    const foto = obtenerFotoProducto(p.id_producto);
-                    return (
-                      <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
-                        <div
-                          onClick={() => {
-                            setProductoSeleccionado(p);
-                            setShowProductoModal(true);
-                          } }
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <ProductCard
-                            producto={p}
-                            className={productoSeleccionado?.id_producto === p.id_producto
-                              ? 'ring-2 ring-primary'
-                              : ''}
-                            fotoUrl={foto || undefined} />
-                        </div>
-
-                        <div className="flex justify-between items-center mt-2 gap-2">
-                          <button
-                            className={`text-lg ${favoritos.includes(p.id_producto)
-                                ? 'text-yellow-400'
-                                : 'text-gray-300'} hover:text-yellow-500`}
-                            title={favoritos.includes(p.id_producto)
-                              ? 'Quitar de favoritos'
-                              : 'Agregar a favoritos'}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setFavoritos(
-                                favoritos.includes(p.id_producto)
-                                  ? favoritos.filter(id => id !== p.id_producto)
-                                  : [...favoritos, p.id_producto]
-                              );
-                            } }
-                          >
-                            {favoritos.includes(p.id_producto) ? '★' : '☆'}
-                          </button>
-
-                          <button
-                            className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto)
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-200 dark:bg-gray-700'}`}
-                            title={carrito.includes(p.id_producto)
-                              ? 'Quitar del carrito'
-                              : 'Agregar al carrito'}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setCarrito(
-                                carrito.includes(p.id_producto)
-                                  ? carrito.filter(id => id !== p.id_producto)
-                                  : [...carrito, p.id_producto]
-                              );
-                            } }
-                          >
-                            {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {productos.filter(p => favoritos.includes(p.id_producto)).length > verMasProductos && (
-                    <button
-                      className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
-                      onClick={() => setVerMasProductos(verMasProductos + 10)}
-                    >
-                      Ver más productos
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </section>
-        )}
+  {/* SECCIÓN DE PRODUCTOS */}
+  {renderProductsSection()}
 
         {/* MAPA Y PRECIOS - COMÚN A TODOS LOS TABS */}
         <section>
@@ -827,7 +661,7 @@ const HomePage: React.FC = () => {
       </main>
       <Footer />
     </div>
-  </> );
+  );
 };
 
 export default HomePage;
