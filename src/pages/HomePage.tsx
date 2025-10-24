@@ -599,7 +599,191 @@ const HomePage: React.FC = () => {
           )}
         </section>
 
-        {/* MAPA Y PRECIOS */}
+        {/* TAB BARATOS */}
+        {tab === 'baratos' && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-lg">Productos más baratos</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 min-h-[220px]">
+              {loadingBusqueda ? (
+                <LoadingSpinner />
+              ) : productosBaratos.length === 0 ? (
+                <div className="text-gray-400 text-center py-4 col-span-2">
+                  No hay productos para mostrar.
+                </div>
+              ) : (
+                <>
+                  {productosBaratos.slice(0, verMasProductos).map(p => {
+                    const foto = obtenerFotoProducto(p.id_producto);
+                    return (
+                      <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+                        <div
+                          onClick={() => {
+                            setProductoSeleccionado(p);
+                            setShowProductoModal(true);
+                          } }
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <ProductCard
+                            producto={p}
+                            className={productoSeleccionado?.id_producto === p.id_producto
+                              ? 'ring-2 ring-primary'
+                              : ''}
+                            fotoUrl={foto || undefined} />
+                        </div>
+
+                        <div className="flex justify-between items-center mt-2 gap-2">
+                          <button
+                            className={`text-lg ${favoritos.includes(p.id_producto)
+                                ? 'text-yellow-400'
+                                : 'text-gray-300'} hover:text-yellow-500`}
+                            title={favoritos.includes(p.id_producto)
+                              ? 'Quitar de favoritos'
+                              : 'Agregar a favoritos'}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setFavoritos(
+                                favoritos.includes(p.id_producto)
+                                  ? favoritos.filter(id => id !== p.id_producto)
+                                  : [...favoritos, p.id_producto]
+                              );
+                            } }
+                          >
+                            {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                          </button>
+
+                          <button
+                            className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto)
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-200 dark:bg-gray-700'}`}
+                            title={carrito.includes(p.id_producto)
+                              ? 'Quitar del carrito'
+                              : 'Agregar al carrito'}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setCarrito(
+                                carrito.includes(p.id_producto)
+                                  ? carrito.filter(id => id !== p.id_producto)
+                                  : [...carrito, p.id_producto]
+                              );
+                            } }
+                          >
+                            {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {productosBaratos.length > verMasProductos && (
+                    <button
+                      className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+                      onClick={() => setVerMasProductos(verMasProductos + 10)}
+                    >
+                      Ver más productos
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* TAB FAVORITOS */}
+        {tab === 'favoritos' && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-lg">Productos favoritos</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 min-h-[220px]">
+              {loadingBusqueda ? (
+                <LoadingSpinner />
+              ) : productos.filter(p => favoritos.includes(p.id_producto)).length === 0 ? (
+                <div className="text-gray-400 text-center py-4 col-span-2">
+                  No tienes productos favoritos aún.
+                </div>
+              ) : (
+                <>
+                  {productos.filter(p => favoritos.includes(p.id_producto)).slice(0, verMasProductos).map(p => {
+                    const foto = obtenerFotoProducto(p.id_producto);
+                    return (
+                      <div key={p.id_producto} className="relative group flex flex-col h-full min-h-[210px]">
+                        <div
+                          onClick={() => {
+                            setProductoSeleccionado(p);
+                            setShowProductoModal(true);
+                          } }
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <ProductCard
+                            producto={p}
+                            className={productoSeleccionado?.id_producto === p.id_producto
+                              ? 'ring-2 ring-primary'
+                              : ''}
+                            fotoUrl={foto || undefined} />
+                        </div>
+
+                        <div className="flex justify-between items-center mt-2 gap-2">
+                          <button
+                            className={`text-lg ${favoritos.includes(p.id_producto)
+                                ? 'text-yellow-400'
+                                : 'text-gray-300'} hover:text-yellow-500`}
+                            title={favoritos.includes(p.id_producto)
+                              ? 'Quitar de favoritos'
+                              : 'Agregar a favoritos'}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setFavoritos(
+                                favoritos.includes(p.id_producto)
+                                  ? favoritos.filter(id => id !== p.id_producto)
+                                  : [...favoritos, p.id_producto]
+                              );
+                            } }
+                          >
+                            {favoritos.includes(p.id_producto) ? '★' : '☆'}
+                          </button>
+
+                          <button
+                            className={`text-xs px-2 py-1 rounded ${carrito.includes(p.id_producto)
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-200 dark:bg-gray-700'}`}
+                            title={carrito.includes(p.id_producto)
+                              ? 'Quitar del carrito'
+                              : 'Agregar al carrito'}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setCarrito(
+                                carrito.includes(p.id_producto)
+                                  ? carrito.filter(id => id !== p.id_producto)
+                                  : [...carrito, p.id_producto]
+                              );
+                            } }
+                          >
+                            {carrito.includes(p.id_producto) ? 'Quitar' : 'Agregar'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {productos.filter(p => favoritos.includes(p.id_producto)).length > verMasProductos && (
+                    <button
+                      className="col-span-2 mt-2 bg-primary text-white rounded px-4 py-2 font-semibold shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+                      onClick={() => setVerMasProductos(verMasProductos + 10)}
+                    >
+                      Ver más productos
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* MAPA Y PRECIOS - COMÚN A TODOS LOS TABS */}
         <section>
           <h2 className="font-bold text-lg mb-2">Cerca de mí</h2>
           <div className="mb-2 text-xs text-gray-400 dark:text-gray-300">
