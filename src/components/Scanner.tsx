@@ -1,27 +1,22 @@
+// src/components/Scanner.tsx
 import React, { useEffect, useRef } from "react";
 import { BrowserMultiFormatReader, BarcodeFormat } from "@zxing/browser";
 import { DecodeHintType, NotFoundException } from "@zxing/library";
 
 interface ScannerProps {
-  onDetected: (result: string) => void;
+  onDetected: (ean: string) => void;
   onError?: (error: Error) => void;
   fullscreen?: boolean;
+  onClose?: () => void; // 👈 nuevo callback para cerrar
 }
 
-const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) => {
+const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-
-  const stopTracks = () => {
-    const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
-    tracks?.forEach(t => t.stop());
-    if (videoRef.current) videoRef.current.srcObject = null;
-  };
 
   useEffect(() => {
     let mounted = true;
 
-    // Hints: priorizamos EAN/UPC/Code128 y TRY_HARDER
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.EAN_13,
@@ -37,53 +32,35 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) =>
       try {
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
         const back = devices.find(
-          d => d.label && (d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("environment"))
+          d =>
+            d.label &&
+            (d.label.toLowerCase().includes("back") ||
+              d.label.toLowerCase().includes("environment"))
         );
-
         const constraints: MediaStreamConstraints =
           back?.deviceId
             ? { video: { deviceId: { exact: back.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
             : { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (!mounted || !videoRef.current) {
-          stream.getTracks().forEach(t => t.stop());
-          return;
-        }
+        if (!mounted || !videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
 
-        // Enfoque continuo y zoom si el hardware lo soporta (no rompe si no)
-        try {
-          const track = stream.getVideoTracks()[0];
-          const caps = track.getCapabilities?.() as MediaTrackCapabilities & { focusMode?: string[]; zoom?: any };
-          const advanced: any[] = [];
-          if (caps?.focusMode?.includes?.("continuous")) advanced.push({ focusMode: "continuous" });
-          if (caps?.zoom) {
-            const target =
-              typeof caps.zoom === "object" && "min" in caps.zoom && "max" in caps.zoom
-                ? Math.min((caps.zoom.min as number) + 1, (caps.zoom.max as number) / 2)
-                : 1;
-            advanced.push({ zoom: target });
+        // Decodificar sin detener cámara
+        codeReaderRef.current?.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, err) => {
+            if (!mounted) return;
+            if (result) {
+              const ean = result.getText();
+              onDetected(ean); // 👈 sólo dispara callback, no detiene
+            } else if (err && !(err instanceof NotFoundException) && onError) {
+              onError(err as Error);
+            }
           }
-          if (advanced.length) await track.applyConstraints({ advanced }).catch(() => {});
-        } catch {}
-
-        // Loop de decodificación
-        codeReaderRef.current?.decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
-          if (!mounted) return;
-
-          if (result) {
-            stopTracks();
-            try {
-              // Algunos tipos de TS no traen estos métodos: llamar defensivamente
-              (codeReaderRef.current as any)?.reset?.();
-            } catch {}
-            onDetected(result.getText());
-          } else if (err && !(err instanceof NotFoundException) && onError) {
-            onError(err as Error);
-          }
-        });
+        );
       } catch (e) {
         if (onError && e instanceof Error) onError(e);
       }
@@ -93,13 +70,35 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) =>
 
     return () => {
       mounted = false;
-      stopTracks();
       try {
-        (codeReaderRef.current as any)?.stopContinuousDecode?.();
-        (codeReaderRef.current as any)?.reset?.();
-      } catch {}
+        // detener tracks de cámara
+        const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
+        tracks?.forEach(t => t.stop());
+        if (videoRef.current) videoRef.current.srcObject = null;
+
+        // reset seguro
+        const reader = codeReaderRef.current as any;
+        if (reader && typeof reader.reset === "function") reader.reset();
+        if (reader && typeof reader.stopContinuousDecode === "function") reader.stopContinuousDecode();
+      } catch (err) {
+        console.warn("Error al limpiar cámara:", err);
+      }
     };
   }, [onDetected, onError]);
+
+  // 🔹 Cerrar cámara manualmente
+  const handleClose = () => {
+    try {
+      const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
+      tracks?.forEach(t => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+
+      const reader = codeReaderRef.current as any;
+      if (reader && typeof reader.reset === "function") reader.reset();
+      if (reader && typeof reader.stopContinuousDecode === "function") reader.stopContinuousDecode();
+    } catch {}
+    if (onClose) onClose();
+  };
 
   return (
     <div
@@ -110,6 +109,7 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) =>
       }
       style={fullscreen ? { width: "100vw", height: "100vh" } : undefined}
     >
+      {/* 📸 Video */}
       <video
         ref={videoRef}
         className={
@@ -119,6 +119,16 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) =>
         muted
         playsInline
       />
+
+      {/* 🔹 Botón Cerrar (solo en fullscreen) */}
+      {fullscreen && (
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 bg-black bg-opacity-60 text-white text-sm font-semibold rounded-full px-3 py-1 shadow-md z-50 hover:bg-opacity-80 transition"
+        >
+          ✖ Cerrar
+        </button>
+      )}
 
       {/* Overlay visual */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
@@ -160,8 +170,12 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen }) =>
       </div>
 
       <div className="mt-2 text-center">
-        <p className="text-base text-primary font-semibold">Apunta la cámara al código de barras</p>
-        <p className="text-xs text-gray-500">Buena luz, ~15–25 cm de distancia, incliná un poco el envase.</p>
+        <p className="text-base text-primary font-semibold">
+          Apunta la cámara al código de barras
+        </p>
+        <p className="text-xs text-gray-400">
+          Buena luz, ~15–25 cm de distancia, incliná un poco el envase.
+        </p>
       </div>
 
       <style>{`
