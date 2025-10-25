@@ -29,6 +29,8 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     'Evita reflejos en el código'
   ], []);
   const lastTipAt = React.useRef<number>(0);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const snapshotInProgressRef = React.useRef(false);
   const borderColor = savedSuccess ? '#22c55e' : '#ff3b3b';
   const scanlineColor = savedSuccess ? '#16a34a' : '#ff3b3b';
 
@@ -47,83 +49,91 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     codeReaderRef.current = new BrowserMultiFormatReader(hints);
 
     const start = async () => {
+      console.log("🚀 Iniciando escáner ZXing...");
       try {
-        // list devices and try to pick back camera; if not possible pass undefined
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+        console.log("📸 Cámaras detectadas:", devices);
+
+        if (devices.length === 0) {
+          console.error("❌ No hay cámaras disponibles.");
+          if (onError) onError(new Error("No se encontró ninguna cámara."));
+          return;
+        }
+
         const back = devices.find(
           (d) =>
             d.label &&
-            (d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("environment"))
+            (d.label.toLowerCase().includes("back") ||
+              d.label.toLowerCase().includes("environment"))
         );
-        const deviceId = back?.deviceId;
+        const deviceId = back?.deviceId || devices[0]?.deviceId;
+        console.log("✅ Usando cámara:", back?.label || devices[0]?.label);
 
-        // Let the library open the camera and attach to the video element
-        await codeReaderRef.current?.decodeFromVideoDevice(
-          deviceId || undefined,
-          videoRef.current || undefined,
-          (result, err) => {
-            if (!mounted) return;
-            if (result) {
-              const ean = result.getText();
-              // cooldown en memoria: ignorar si ya vimos ese EAN hace menos de COOLDOWN_MS
-              try {
-                const now = Date.now();
-                const lastTs = seenMapRef.current.get(ean);
-                if (lastTs && now - lastTs < COOLDOWN_MS) {
-                  // Ignorar re-detección rápida
-                  return;
-                }
-                // registrar timestamp
-                seenMapRef.current.set(ean, now);
-                // podar entradas viejas ocasionalmente
-                if (seenMapRef.current.size > 1000) {
-                  const cutoff = now - 60000; // 60s
-                  for (const [k, v] of Array.from(seenMapRef.current.entries())) {
-                    if (v < cutoff) seenMapRef.current.delete(k);
-                  }
-                }
-              } catch (e) {
-                // ignore
-              }
-              setLastDetected(ean);
-              setFailedAttempts(0);
-              setShowTip(false);
-              // guardar localmente
-              saveEanLocally(ean);
-              // visual feedback local
-              setTimeout(() => setLastDetected(null), 1800);
-              onDetected(ean); // notify parent
-            } else {
-              // No result: increment failed attempts (NotFoundException is common)
-              setFailedAttempts(prev => {
-                const nv = prev + 1;
-                const now = Date.now();
-                // show tip only once per 30s when threshold reached
-                if (nv >= 4 && (!showTip && now - (lastTipAt.current || 0) > 30000)) {
-                  setShowTip(true);
-                  lastTipAt.current = now;
-                }
-                return nv;
-              });
-              if (err && !(err instanceof NotFoundException) && onError) {
-                onError(err as Error);
-              }
-            }
-          }
-        );
-
-        // Try to enable continuous autofocus if supported
+        // Abrir stream de mayor calidad y reproducir el video
         try {
-          const stream = (videoRef.current?.srcObject as MediaStream | null) || null;
-          const track = stream?.getVideoTracks()[0];
-          if (track && typeof (track as any).applyConstraints === 'function') {
-            // try continuous focus (best-effort) — cast to any to avoid TS type errors
-            await (track as any).applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            try { await videoRef.current.play(); } catch (_) { /* autoplay might be blocked */ }
           }
         } catch (e) {
-          // ignore
+          console.warn('No se pudo abrir getUserMedia con constraints elevados, ZXing intentará abrir por su cuenta', e);
         }
+
+        const reader = codeReaderRef.current as any;
+        if (!reader) return;
+
+        console.log('▶️ Iniciando lectura continua...');
+        try {
+          // decodeFromVideoElementContinuously lee directamente del elemento <video>
+          await (reader as any).decodeFromVideoElementContinuously(videoRef.current!, (result: any, err: any) => {
+            if (result) {
+              const ean = result.getText();
+              console.log('📦 Código detectado:', ean);
+              setLastDetected(ean);
+              onDetected(ean);
+              setFailedAttempts(0);
+              setShowTip(false);
+            } else if (err && !(err instanceof NotFoundException)) {
+              console.warn('⚠️ Error ZXing:', err);
+              if (onError) onError(err as Error);
+            }
+          });
+        } catch (e) {
+          // decodeFromVideoElementContinuously puede lanzar si el reader se reinicia; loguear para depuración
+          console.warn('decodeFromVideoElementContinuously finalizó con error o fue detenido:', e);
+        }
+
+        // 🔍 Debug visual opcional
+        const checkFrames = () => {
+          const video = videoRef.current;
+          if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // muestra un rectángulo de previsualización
+            const avg = ctx?.getImageData(0, 0, 1, 1).data;
+            if (avg) console.log("🎥 Frame activo. Pixel[0,0]:", avg);
+          } else {
+            console.log("🕓 Esperando frames de cámara...");
+          }
+        };
+
+        // monitoreo cada 3 segundos
+        const debugInterval = setInterval(checkFrames, 3000);
+
+        return () => clearInterval(debugInterval);
       } catch (e) {
+        console.error("💥 Error inicializando cámara:", e);
         if (onError && e instanceof Error) onError(e);
       }
     };
@@ -133,19 +143,13 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     return () => {
       mounted = false;
       try {
-        // detener tracks de cámara
         const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
-        tracks?.forEach(t => t.stop());
+        tracks?.forEach((t) => t.stop());
         if (videoRef.current) videoRef.current.srcObject = null;
-
-        // reset seguro
-        const reader = codeReaderRef.current as any;
-        if (reader && typeof reader.reset === "function") reader.reset();
-        if (reader && typeof reader.stopContinuousDecode === "function") reader.stopContinuousDecode();
+        try { (codeReaderRef.current as any)?.reset(); } catch (e) {}
       } catch (err) {
-        console.warn("Error al limpiar cámara:", err);
+        console.warn("⚠️ Error al detener cámara:", err);
       }
-      setScanning(false);
     };
   }, [onDetected, onError]);
 
@@ -169,16 +173,118 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     }
   };
 
+  const handleDetectionFromSnapshot = (ean: string) => {
+    try {
+      const now = Date.now();
+      const lastTs = seenMapRef.current.get(ean);
+      if (lastTs && now - lastTs < COOLDOWN_MS) return false as any;
+      seenMapRef.current.set(ean, now);
+      setLastDetected(ean);
+      setFailedAttempts(0);
+      setShowTip(false);
+      saveEanLocally(ean);
+      setTimeout(() => setLastDetected(null), 1800);
+      onDetected(ean);
+      return true as any;
+    } catch (e) {
+      return false as any;
+    }
+  };
+
+  const trySnapshotDecode = async (): Promise<boolean> => {
+    if (snapshotInProgressRef.current) return false;
+    snapshotInProgressRef.current = true;
+    try {
+      const video = videoRef.current;
+      if (!video) return false;
+      const w = video.videoWidth || video.clientWidth || 640;
+      const h = video.videoHeight || video.clientHeight || 360;
+      let canvas: HTMLCanvasElement;
+        if (canvasRef.current) {
+          canvas = canvasRef.current;
+        } else {
+          canvas = document.createElement('canvas');
+        }
+        canvas.width = w;
+        canvas.height = h;
+        // willReadFrequently para optimizar lecturas repetidas de getImageData
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return false;
+      ctx.drawImage(video, 0, 0, w, h);
+      // preprocesado simple: grayscale + contraste por estiramiento lineal + umbral ligero
+      const img = ctx.getImageData(0, 0, w, h);
+      const data = img.data;
+      let min = 255, max = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+        data[i] = data[i + 1] = data[i + 2] = lum;
+        if (lum < min) min = lum;
+        if (lum > max) max = lum;
+      }
+      const range = (max - min) || 1;
+      for (let i = 0; i < data.length; i += 4) {
+        let v = data[i];
+        let nv = Math.round((v - min) * 255 / range);
+        if (nv < 30) nv = 0;
+        data[i] = data[i + 1] = data[i + 2] = nv;
+      }
+      ctx.putImageData(img, 0, 0);
+      if (!canvasRef.current) canvasRef.current = canvas;
+
+      const readerAny = codeReaderRef.current as any;
+      // intentos varios de decodificación (depende de la API disponible en la versión de ZXing)
+      try {
+        if (readerAny && typeof readerAny.decodeFromImage === 'function') {
+          // algunos readers aceptan HTMLCanvasElement
+          const res = await readerAny.decodeFromImage(canvas);
+          if (res && res.getText) {
+            return !!handleDetectionFromSnapshot(res.getText());
+          }
+        }
+      } catch (e) {}
+
+      try {
+        if (readerAny && typeof readerAny.decodeFromCanvas === 'function') {
+          const res = await readerAny.decodeFromCanvas(canvas);
+          if (res && res.getText) {
+            return !!handleDetectionFromSnapshot(res.getText());
+          }
+        }
+      } catch (e) {}
+
+      // fallback: toDataURL + decodeFromImage callback style
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        if (readerAny && typeof readerAny.decodeFromImage === 'function') {
+          const res = await new Promise((resolve, reject) => {
+            try {
+              readerAny.decodeFromImage(undefined, dataUrl, (r: any, err: any) => {
+                if (r) resolve(r); else reject(err);
+              });
+            } catch (ee) {
+              reject(ee);
+            }
+          });
+          if (res && (res as any).getText) {
+            return !!handleDetectionFromSnapshot((res as any).getText());
+          }
+        }
+      } catch (e) {}
+
+    } finally {
+      snapshotInProgressRef.current = false;
+    }
+    return false;
+  };
+
   // 🔹 Cerrar cámara manualmente
   const handleClose = () => {
     try {
       const tracks = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
       tracks?.forEach(t => t.stop());
       if (videoRef.current) videoRef.current.srcObject = null;
-
-      const reader = codeReaderRef.current as any;
-      if (reader && typeof reader.reset === "function") reader.reset();
-      if (reader && typeof reader.stopContinuousDecode === "function") reader.stopContinuousDecode();
+      // reader reset/stop handled by cleanup in useEffect; solo detenemos tracks localmente
     } catch {}
     if (onClose) onClose();
   };
@@ -204,7 +310,7 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
       />
 
       {/* 🔹 Botón Cerrar (solo en fullscreen) */}
-      {fullscreen && (
+      {fullscreen && onClose && (
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 bg-black bg-opacity-60 text-white text-sm font-semibold rounded-full px-3 py-1 shadow-md z-50 hover:bg-opacity-80 transition"
@@ -288,10 +394,51 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
               <div className="font-semibold">Consejo:</div>
               <div className="text-sm mt-1">{tips[(failedAttempts - 1) % tips.length]}</div>
               <div className="mt-2 flex justify-center gap-2">
-                <button className="text-xs px-3 py-1 bg-primary text-white rounded" onClick={() => { setShowTip(false); setFailedAttempts(0); }}>Entendido</button>
-                <button className="text-xs px-3 py-1 bg-white border rounded" onClick={() => { setFailedAttempts(0); setShowTip(false); }}>Cerrar</button>
+                <button className="text-xs px-3 py-1 bg-primary text-white rounded" onClick={() => { setShowTip(false); setFailedAttempts(0); lastTipAt.current = Date.now(); }}>Entendido</button>
+                <button className="text-xs px-3 py-1 bg-white border rounded" onClick={() => { setFailedAttempts(0); setShowTip(false); lastTipAt.current = Date.now(); }}>Cerrar</button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* botón para forzar uso de cámara trasera si el usuario lo solicita */}
+        {fullscreen && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50">
+            <button
+              className="text-xs px-3 py-1 bg-white border rounded"
+              onClick={async () => {
+                try {
+                  // intentar solicitar media con facingMode environment
+                  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } });
+                  // si obtuvimos stream, detener reader actual y reiniciar con el deviceId si está disponible
+                  const track = s.getVideoTracks()[0];
+                  const settings: any = track.getSettings ? track.getSettings() : {};
+                  const deviceId = settings.deviceId;
+                  // stop the temporary track we opened (we just wanted permissions/deviceId)
+                  s.getTracks().forEach(t => t.stop());
+                  // detener tracks actuales y reasignar stream con el deviceId seleccionado
+                  try {
+                    const curr = (videoRef.current?.srcObject as MediaStream | null)?.getTracks();
+                    curr?.forEach(t => t.stop());
+                    if (videoRef.current) videoRef.current.srcObject = null;
+                  } catch (e) {
+                    console.warn('Error deteniendo stream actual', e);
+                  }
+                  try {
+                    const newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+                    if (videoRef.current) videoRef.current.srcObject = newStream;
+                  } catch (e) {
+                    console.warn('No se pudo abrir stream para el deviceId solicitado', e);
+                  }
+                } catch (e) {
+                  // permiso o error: mostrar consejo persistente
+                  setShowTip(true);
+                  lastTipAt.current = Date.now();
+                }
+              }}
+            >
+              Forzar cámara trasera
+            </button>
           </div>
         )}
 
