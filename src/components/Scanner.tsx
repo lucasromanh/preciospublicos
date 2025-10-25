@@ -14,8 +14,12 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const [lastDetected, setLastDetected] = React.useState<string | null>(null);
-  const [capturing, setCapturing] = React.useState(false);
   const [scanning, setScanning] = React.useState(true);
+  const [savedSuccess, setSavedSuccess] = React.useState(false);
+  const lastSavedRef = React.useRef<string | null>(null);
+  // cooldown map para evitar procesar el mismo EAN varias veces en corto tiempo
+  const seenMapRef = React.useRef<Map<string, number>>(new Map());
+  const COOLDOWN_MS = 5000; // 5 segundos
   const [failedAttempts, setFailedAttempts] = React.useState(0);
   const [showTip, setShowTip] = React.useState(false);
   const tips = React.useMemo(() => [
@@ -24,6 +28,9 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     'Asegurate de tener buena luz',
     'Evita reflejos en el código'
   ], []);
+  const lastTipAt = React.useRef<number>(0);
+  const borderColor = savedSuccess ? '#22c55e' : '#ff3b3b';
+  const scanlineColor = savedSuccess ? '#16a34a' : '#ff3b3b';
 
   useEffect(() => {
     let mounted = true;
@@ -58,9 +65,31 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
             if (!mounted) return;
             if (result) {
               const ean = result.getText();
+              // cooldown en memoria: ignorar si ya vimos ese EAN hace menos de COOLDOWN_MS
+              try {
+                const now = Date.now();
+                const lastTs = seenMapRef.current.get(ean);
+                if (lastTs && now - lastTs < COOLDOWN_MS) {
+                  // Ignorar re-detección rápida
+                  return;
+                }
+                // registrar timestamp
+                seenMapRef.current.set(ean, now);
+                // podar entradas viejas ocasionalmente
+                if (seenMapRef.current.size > 1000) {
+                  const cutoff = now - 60000; // 60s
+                  for (const [k, v] of Array.from(seenMapRef.current.entries())) {
+                    if (v < cutoff) seenMapRef.current.delete(k);
+                  }
+                }
+              } catch (e) {
+                // ignore
+              }
               setLastDetected(ean);
               setFailedAttempts(0);
               setShowTip(false);
+              // guardar localmente
+              saveEanLocally(ean);
               // visual feedback local
               setTimeout(() => setLastDetected(null), 1800);
               onDetected(ean); // notify parent
@@ -68,7 +97,12 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
               // No result: increment failed attempts (NotFoundException is common)
               setFailedAttempts(prev => {
                 const nv = prev + 1;
-                if (nv >= 4) setShowTip(true);
+                const now = Date.now();
+                // show tip only once per 30s when threshold reached
+                if (nv >= 4 && (!showTip && now - (lastTipAt.current || 0) > 30000)) {
+                  setShowTip(true);
+                  lastTipAt.current = now;
+                }
                 return nv;
               });
               if (err && !(err instanceof NotFoundException) && onError) {
@@ -115,46 +149,23 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
     };
   }, [onDetected, onError]);
 
-  // capture still frame and attempt to decode from the captured image (helpful when autofocus fails)
-  const handleCapture = async () => {
-    if (!videoRef.current || !codeReaderRef.current) return;
-    setCapturing(true);
+  // Guarda el EAN localmente en localStorage para comparar luego con backend
+  const saveEanLocally = (ean: string) => {
     try {
-      const vw = videoRef.current.videoWidth || 1280;
-      const vh = videoRef.current.videoHeight || 720;
-      const canvas = document.createElement('canvas');
-      canvas.width = vw;
-      canvas.height = vh;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas no soportado');
-      ctx.drawImage(videoRef.current, 0, 0, vw, vh);
-      const data = canvas.toDataURL('image/png');
-      const img = new Image();
-      img.src = data;
-      await new Promise<void>((res) => (img.onload = () => res()));
-      // try decode from image element
-      // try decode from data URL (decodeFromImageUrl exists in some builds)
-      const res = await (codeReaderRef.current as any).decodeFromImageUrl?.(data).catch(() => null);
-      if (res && typeof (res as any).getText === 'function') {
-        const ean = (res as any).getText();
-        setLastDetected(ean);
-        setFailedAttempts(0);
-        setShowTip(false);
-        setTimeout(() => setLastDetected(null), 1800);
-        onDetected(ean);
-      } else {
-        // failed decode from captured image
-        setFailedAttempts(prev => {
-          const nv = prev + 1;
-          if (nv >= 4) setShowTip(true);
-          return nv;
-        });
-        if (onError) onError(new Error('No se pudo leer el código desde la foto. Intentá mover un poco la cámara.'));
-      }
-    } catch (err) {
-      if (onError && err instanceof Error) onError(err);
-    } finally {
-      setCapturing(false);
+      // evitar duplicados rápidos
+      if (lastSavedRef.current === ean) return;
+      const key = 'scanned_eans';
+      const raw = localStorage.getItem(key);
+      const arr = raw ? JSON.parse(raw) as Array<{ ean: string; ts: number }> : [];
+      arr.unshift({ ean, ts: Date.now() });
+      // limitar a 200 elementos
+      const sliced = arr.slice(0, 200);
+      localStorage.setItem(key, JSON.stringify(sliced));
+      lastSavedRef.current = ean;
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 1600);
+    } catch (e) {
+      // ignore storage errors
     }
   };
 
@@ -241,31 +252,25 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
         </div>
       </div>
 
-      {/* INTERPRETANDO / ANIMACION DE PROCESADO */}
-      {scanning && !lastDetected && !capturing && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[28%] z-40 pointer-events-none">
-          {/* blur + overlay para mayor contraste en entornos claros */}
-          <div className="absolute left-0 top-0 w-full h-full" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }} />
-          <div className="flex flex-col items-center gap-2 relative">
-            <div className="w-16 h-16 rounded-full border-4 border-primary/30 animate-spin-slow flex items-center justify-center bg-black/25">
-              <div className="w-6 h-6 rounded-full bg-primary/90" />
+      {/* INTERPRETANDO / ANIMACION DE PROCESADO -> scanline más visible dentro del recuadro */}
+  {scanning && !lastDetected && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-40" aria-hidden>
+          <div style={{ width: '78%', maxWidth: 520, aspectRatio: '1.9 / 1', position: 'relative' }}>
+            {/* Semi-opaque backdrop behind the hint only (no full blur) */}
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.08)', borderRadius: 8 }} />
+              {/* scanline (thicker) */}
+              <div style={{ position: 'absolute', left: 0, right: 0, height: 4, background: `linear-gradient(90deg, rgba(0,0,0,0) 0%, ${scanlineColor} 50%, rgba(0,0,0,0) 100%)`, boxShadow: `0 0 12px ${scanlineColor}`, animation: 'scan-move 1.6s linear infinite' }} />
+              {/* colored border */}
+              <div style={{ position: 'absolute', inset: 0, border: `3px solid ${borderColor}`, borderRadius: 8, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 12, display: 'flex', justifyContent: 'center' }}>
+              <div className="text-white text-sm font-semibold bg-black/45 px-3 py-1 rounded">Interpretando código...</div>
             </div>
-            <div className="text-white text-sm font-semibold bg-black/40 px-3 py-1 rounded">Interpretando código...</div>
           </div>
         </div>
       )}
 
       {/* CAPTURANDO / PROCESANDO IMAGEN */}
-      {capturing && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[28%] z-40 pointer-events-none">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center animate-pulse bg-black/40">
-              <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 7v6l4 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-            <div className="text-white text-sm font-semibold bg-black/50 px-3 py-1 rounded">Procesando imagen...</div>
-          </div>
-        </div>
-      )}
+      
 
         {/* feedback simple: último código detectado */}
         {lastDetected && (
@@ -274,16 +279,7 @@ const Scanner: React.FC<ScannerProps> = ({ onDetected, onError, fullscreen, onCl
           </div>
         )}
 
-        {/* Capturar frame manualmente */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <button
-            onClick={handleCapture}
-            className="bg-white/90 text-black px-4 py-2 rounded-full shadow-md font-semibold"
-            disabled={capturing}
-          >
-            {capturing ? 'Procesando...' : 'Capturar'}
-          </button>
-        </div>
+        {/* Manual capture removed: scanning is automatic in fullscreen */}
 
         {/* Tips después de fallos repetidos */}
         {showTip && (

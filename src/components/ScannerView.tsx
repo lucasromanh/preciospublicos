@@ -66,6 +66,75 @@ const ScannerView: React.FC = () => {
     setError(null);
   };
 
+  // ---------- Historial local de EANs escaneados
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<Array<{ ean: string; ts: number }>>(() => {
+    try {
+      const raw = localStorage.getItem('scanned_eans');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyMsg, setHistoryMsg] = useState<string | null>(null);
+
+  const refreshHistory = () => {
+    try {
+      const raw = localStorage.getItem('scanned_eans');
+      setHistory(raw ? JSON.parse(raw) : []);
+    } catch {
+      setHistory([]);
+    }
+  };
+
+  const clearHistory = () => {
+    localStorage.removeItem('scanned_eans');
+    setHistory([]);
+    setHistoryMsg('Historial limpiado');
+    setTimeout(() => setHistoryMsg(null), 2000);
+  };
+
+  const removeHistoryAt = (index: number) => {
+    const copy = [...history];
+    copy.splice(index, 1);
+    localStorage.setItem('scanned_eans', JSON.stringify(copy));
+    setHistory(copy);
+  };
+
+  const buscarEnBackend = async (ean: string) => {
+    setHistoryLoading(true);
+    setHistoryMsg(null);
+    try {
+      const res = await fetch(`https://masbarato.saltacoders.com/api.php?action=getProductByEAN&ean=${encodeURIComponent(ean)}`);
+      if (!res.ok) throw new Error('Error API');
+      const data = await res.json();
+      setHistoryMsg(`EAN ${ean}: ${Array.isArray(data) && data.length ? `Encontrado: ${data[0].productos_descripcion}` : 'No encontrado'}`);
+    } catch (e: any) {
+      setHistoryMsg(`Error buscando ${ean}`);
+    } finally {
+      setHistoryLoading(false);
+      setTimeout(() => setHistoryMsg(null), 3500);
+    }
+  };
+
+  const reenviarTodos = async () => {
+    if (history.length === 0) return;
+    setHistoryLoading(true);
+    let found = 0;
+    for (const item of history) {
+      try {
+        const res = await fetch(`https://masbarato.saltacoders.com/api.php?action=getProductByEAN&ean=${encodeURIComponent(item.ean)}`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) found++;
+      } catch {}
+    }
+    setHistoryMsg(`Reenvío terminado. Productos encontrados: ${found}`);
+    setHistoryLoading(false);
+    setTimeout(() => setHistoryMsg(null), 4000);
+  };
+
   if (!showScanner) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center px-4">
@@ -121,6 +190,45 @@ const ScannerView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Historial local toggle */}
+      <div className="w-full flex justify-center mt-4">
+        <button className="px-3 py-1 rounded bg-gray-100 text-sm" onClick={() => { setHistoryOpen(!historyOpen); refreshHistory(); }}>
+          {historyOpen ? 'Cerrar historial' : `Historial (${history.length})`}
+        </button>
+      </div>
+
+      {historyOpen && (
+        <div className="w-full max-w-md bg-white rounded shadow p-3 mt-3">
+          <div className="flex justify-between items-center mb-2">
+            <strong>Historial local</strong>
+            <div className="flex gap-2">
+              <button className="text-xs px-2 py-1 bg-primary text-white rounded" onClick={reenviarTodos} disabled={historyLoading}>Reenviar todos</button>
+              <button className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded" onClick={clearHistory}>Limpiar</button>
+            </div>
+          </div>
+          {historyLoading && <div className="text-sm text-gray-500 mb-2">Procesando...</div>}
+          {historyMsg && <div className="text-sm text-gray-600 mb-2">{historyMsg}</div>}
+          {history.length === 0 ? (
+            <div className="text-xs text-gray-400">No hay escaneos guardados.</div>
+          ) : (
+            <ul className="space-y-2 max-h-48 overflow-y-auto">
+              {history.map((item, idx) => (
+                <li key={`${item.ean}-${item.ts}-${idx}`} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <div className="text-xs">
+                    <div className="font-mono text-sm">{item.ean}</div>
+                    <div className="text-gray-400 text-[11px]">{new Date(item.ts).toLocaleString()}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="text-xs px-2 py-1 bg-white border rounded" onClick={() => buscarEnBackend(item.ean)}>Buscar</button>
+                    <button className="text-xs px-2 py-1 bg-red-50 text-red-700 rounded" onClick={() => removeHistoryAt(idx)}>Eliminar</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {
